@@ -23,6 +23,7 @@ export default function AIAssistant({ activeProjectId, settings }: { activeProje
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [assistantMemory, setAssistantMemory] = useState<any>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -32,6 +33,22 @@ export default function AIAssistant({ activeProjectId, settings }: { activeProje
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    // Load memory from localStorage
+    const savedMemory = localStorage.getItem(`retroforge_memory_${activeProjectId}`);
+    if (savedMemory) setAssistantMemory(JSON.parse(savedMemory));
+    
+    setMessages([
+      { role: 'assistant', content: 'Olá! Sou o RetroForge AI. Percebi que você está trabalhando em um projeto. Como posso ajudar na portabilidade ou tradução técnica hoje?' }
+    ]);
+  }, [activeProjectId]);
+
+  useEffect(() => {
+    if (activeProjectId) {
+      localStorage.setItem(`retroforge_memory_${activeProjectId}`, JSON.stringify(assistantMemory));
+    }
+  }, [assistantMemory, activeProjectId]);
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;

@@ -102,8 +102,18 @@ export const CFGVisualizer: React.FC<CFGVisualizerProps> = ({ nodes, links, onNo
       .attr('rx', 6)
       .attr('x', -60)
       .attr('y', -20)
-      .attr('fill', (d: any) => d.type === 'function' ? 'rgba(6, 182, 212, 0.2)' : 'rgba(30, 41, 59, 0.8)')
-      .attr('stroke', (d: any) => d.type === 'function' ? '#06b6d4' : '#334155')
+      .attr('fill', (d: any) => {
+        if (d.type === 'entry') return 'rgba(34, 197, 94, 0.2)'; // Greenish for entry
+        if (d.type === 'exit') return 'rgba(239, 68, 68, 0.2)'; // Reddish for exit
+        if (d.type === 'function') return 'rgba(6, 182, 212, 0.2)'; // Cyan for functions
+        return 'rgba(30, 41, 59, 0.8)';
+      })
+      .attr('stroke', (d: any) => {
+        if (d.type === 'entry') return '#22c55e';
+        if (d.type === 'exit') return '#ef4444';
+        if (d.type === 'function') return '#06b6d4';
+        return '#334155';
+      })
       .attr('stroke-width', 2)
       .on('click', (event, d) => onNodeSelect?.(d as Node));
 

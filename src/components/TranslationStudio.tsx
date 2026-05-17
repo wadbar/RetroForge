@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import { Search, Globe, Languages, FileText, ChevronRight, CheckCircle, AlertCircle, Sparkles, Loader2, Upload, Download, Brackets, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { kmpSearch, BoyerMoore } from '../services/searchUtils';
-import { analyzeEncodingWithAI } from '../services/aiDecompilerService';
+import { analyzeEncodingWithAI, translateStringsWithAI } from '../services/aiDecompilerService';
 
 import { BinarySearchUseCase } from '../core/useCases/BinarySearchUseCase';
 import { SecurityUtils } from '../services/searchUtils';
@@ -32,6 +32,7 @@ export default function TranslationStudio() {
   const [isTranslating, setIsTranslating] = useState(false);
   const [fileDetails, setFileDetails] = useState<{name: string, size: number} | null>(null);
   const [fileData, setFileData] = useState<Uint8Array | null>(null);
+  const [commonSequences, setCommonSequences] = useState<{sequence: string, count: number}[]>([]);
   const [targetLanguage, setTargetLanguage] = useState('Português (Brasil)');
   const [repointingEnabled, setRepointingEnabled] = useState(true);
   
@@ -84,6 +85,11 @@ export default function TranslationStudio() {
     const extracted = extractStringsLogic(data);
     const endClock = performance.now();
     setStrings(extracted);
+    
+    // Identify common sequences
+    const sequences = identifyCommonSequences(extracted);
+    setCommonSequences(sequences);
+    
     storage.set('current_translations', extracted);
     addAgentLog(`Extração concluída em ${(endClock - startClock).toFixed(2)}ms. ${extracted.length} strings encontradas.`);
     setAgentProgress(20);
@@ -167,6 +173,20 @@ export default function TranslationStudio() {
       showToast('error', 'Falha na extração de strings.');
       return [];
     }
+  };
+
+  const identifyCommonSequences = (extracted: TranslatedString[]) => {
+    const counts: Record<string, number> = {};
+    extracted.forEach(s => {
+      if (s.original.length > 3) {
+        counts[s.original] = (counts[s.original] || 0) + 1;
+      }
+    });
+    return Object.entries(counts)
+      .filter(([_, count]) => count > 1)
+      .map(([sequence, count]) => ({ sequence, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -298,39 +318,41 @@ export default function TranslationStudio() {
     }
 
     try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [{ role: 'user', parts: [{ text: `Traduza as seguintes strings de um jogo de RPG para ${targetLanguage}, garantindo contexto. Retorne estritamente um array JSON de strings traduzidas (na EXATA mesma ordem e tamanho do array original). Strings originais: \n${JSON.stringify(pendingStrings.map(s => s.original))}` }] }],
-          systemInstruction: "Você é um tradutor profissional de jogos retro. Sua resposta DEVE OBRIGATORIAMENTE ser um Array JSON válido com as strings traduzidas, por exemplo: [\"texto 1\", \"texto 2\"]. O número de itens deve ser EXATAMENTE igual."
-        })
-      });
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
+      const BATCH_SIZE = 25; // Smaller batch for more detailed analysis per string
+      const totalBatches = Math.ceil(pendingStrings.length / BATCH_SIZE);
+      let currentStrings = [...strings];
 
-      // Parse JSON from text, extracting markdown block if present
-      let rawText = data.response || "[]";
-      rawText = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
-      let translatedLines: string[] = [];
-      try {
-        translatedLines = JSON.parse(rawText);
-      } catch (err) {
-        console.error("Failed to parse AI response as JSON", err, rawText);
-        throw new Error("Resposta da IA inválida (JSON esperado).");
-      }
-      
-      setStrings(prev => {
-        let translationIdx = 0;
-        return prev.map(s => {
-          if ((!s.translation || s.status === 'pending') && translatedLines[translationIdx]) {
-            const res = { ...s, translation: translatedLines[translationIdx].replace(/^- /, ''), status: 'auto-translated' as const };
-            translationIdx++;
-            return res;
+      for (let i = 0; i < totalBatches; i++) {
+        const batch = pendingStrings.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE);
+        addAgentLog(`Traduzindo lote ${i + 1}/${totalBatches}...`);
+
+        const translationResult = await translateStringsWithAI(
+          batch.map(s => s.original),
+          "RETRO_BIN", 
+          targetLanguage
+        );
+
+        const translatedItems = translationResult.translations || [];
+        
+        currentStrings = currentStrings.map(s => {
+          const batchItem = batch.find(b => b.id === s.id);
+          if (batchItem) {
+            const translatedItem = translatedItems.find((t: any) => t.original === batchItem.original);
+            if (translatedItem) {
+              return { 
+                ...s, 
+                translation: translatedItem.translated, 
+                status: 'auto-translated' as const 
+              };
+            }
           }
           return s;
         });
-      });
+        
+        setStrings([...currentStrings]);
+      }
+      
+      showToast('success', 'Tradução concluída com sucesso!');
     } catch (error) {
       console.error(error);
       openModal("Erro", `Erro ao traduzir: ${String(error)}`, true);
@@ -587,6 +609,24 @@ export default function TranslationStudio() {
           )}
         </div>
       </div>
+
+      {commonSequences.length > 0 && (
+        <div className="bg-[#141414] p-6 rounded-2xl border border-white/5">
+          <div className="flex items-center gap-2 mb-4">
+             <FileText className="w-5 h-5 text-amber-500" />
+             <h3 className="text-white font-bold text-sm uppercase tracking-widest">Sequências Comuns (Otimização de Patch)</h3>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {commonSequences.map((seq, i) => (
+              <div key={i} className="px-3 py-1 bg-white/5 border border-white/10 rounded-lg flex items-center gap-2 group hover:border-amber-500/30 transition-colors">
+                <span className="text-gray-400 text-xs truncate max-w-[150px]">{seq.sequence}</span>
+                <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-500 text-[10px] font-bold rounded">{seq.count}x</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-gray-500 mt-3 italic">Identificamos padrões repetitivos que podem ser centralizados para economizar espaço no binário original.</p>
+        </div>
+      )}
 
       <div className="bg-[#141414] border border-white/5 rounded-2xl overflow-hidden flex-1 flex flex-col">
         <div className="p-4 border-b border-white/5 bg-black/20 flex items-center gap-4">

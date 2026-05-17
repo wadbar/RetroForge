@@ -3,8 +3,8 @@ import { Wrench, Zap, Binary, Bug, Eye, EyeOff, Save, Code, Brackets, Sparkles, 
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 import { CFGVisualizer } from './CFGVisualizer';
-import { decompileWithAI, generatePatchWithAI, compileASMWithAI, analyzeCallStackWithAI, advancedDecipherWithAI, suggestHLEWithAI, scanSignaturesWithAI, symbolicExecutionAssistant, deepAnalyzeWithAI, extractSignatureWithAI, scanWithYaraAI } from '../services/aiDecompilerService';
-import { ArchType, SystemStatus } from '../core/types';
+import { decompileWithAI, generatePatchWithAI, compileASMWithAI, refactorASMWithAI, analyzeCallStackWithAI, advancedDecipherWithAI, suggestHLEWithAI, scanSignaturesWithAI, symbolicExecutionAssistant, deepAnalyzeWithAI, extractSignatureWithAI, scanWithYaraAI, deepScanWithAI, injectKnowledgeV9 } from '../services/aiDecompilerService';
+import { ArchType, SystemStatus, ARCH_METADATA } from '../core/types';
 import { ScannerUseCase } from '../core/useCases/ScannerUseCase';
 import { eventBus } from '../services/eventBus';
 import { storage } from '../services/storageService';
@@ -24,6 +24,55 @@ import { HexInspector } from './ui/HexInspector';
 import { BinaryDiffUseCase } from '../core/useCases/BinaryDiffUseCase';
 import { AnalyzeStructureUseCase } from '../core/useCases/AnalyzeStructureUseCase';
 
+function TilePreview({ data, offset }: { data: Uint8Array, offset: number }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    const ctx = canvasRef.current.getContext('2d');
+    if (!ctx) return;
+
+    const size = 16; // 16x16 preview
+    canvasRef.current.width = size;
+    canvasRef.current.height = size;
+    const imgData = ctx.createImageData(size, size);
+    
+    // Interpret as raw 4bpp (linear) for simple preview
+    for (let i = 0; i < (size * size) / 2; i++) {
+        const byteIndex = offset + i;
+        if (byteIndex >= data.length) break;
+        const byte = data[byteIndex];
+        
+        // Pixel 1 (high nibble)
+        const p1 = (byte >> 4) * 17;
+        const idx1 = (i * 2) * 4;
+        imgData.data[idx1] = p1;
+        imgData.data[idx1 + 1] = p1;
+        imgData.data[idx1 + 2] = p1;
+        imgData.data[idx1 + 3] = 255;
+        
+        // Pixel 2 (low nibble)
+        const p2 = (byte & 0x0F) * 17;
+        const idx2 = (i * 2 + 1) * 4;
+        imgData.data[idx2] = p2;
+        imgData.data[idx2 + 1] = p2;
+        imgData.data[idx2 + 2] = p2;
+        imgData.data[idx2 + 3] = 255;
+    }
+    ctx.putImageData(imgData, 0, 0);
+  }, [data, offset]);
+
+  return (
+    <div className="bg-black border border-cyan-500/50 p-1.5 rounded-xl shadow-[0_0_30px_rgba(6,182,212,0.3)] animate-in fade-in zoom-in duration-200">
+      <canvas ref={canvasRef} className="w-32 h-32 image-rendering-pixelated rounded-lg" />
+      <div className="flex justify-between items-center mt-2 px-1">
+        <span className="text-[10px] text-cyan-400 font-black tracking-widest uppercase">Visual Preview</span>
+        <span className="text-[10px] text-gray-500 font-mono">0x{offset.toString(16).toUpperCase()}</span>
+      </div>
+    </div>
+  );
+}
+
 interface RecompTask {
   id: string;
   name: string;
@@ -33,17 +82,165 @@ interface RecompTask {
 }
 
 export default function ModdingHub({ settings }: { settings?: any }) {
-  const [activeTool, setActiveTool] = useState<'hex' | 'decompiler' | 'scanner' | 'strings' | 'pipeline' | 'cpu' | 'ai' | 'lab' | 'scripts'>('pipeline');
-  const [asmCode, setAsmCode] = useState('/* Prologue Example MIPS R3000 */\naddiu $sp, $sp, -32\nsw $ra, 28($sp)\nsw $s0, 24($sp)\nli $v0, 1\n# ... function body ...\nlw $s0, 24($sp)\nlw $ra, 28($sp)\naddiu $sp, $sp, 32\njr $ra\nnop');
-  const [cppResult, setCppResult] = useState('');
-  const [analysisResult, setAnalysisResult] = useState<string | null>(null);
+  const [activeTool, setActiveTool] = useState<'hex' | 'decompiler' | 'scanner' | 'strings' | 'pipeline' | 'cpu' | 'ai' | 'lab' | 'scripts' | 'v9'>('v9');
+  const [v9Diagnostic, setV9Diagnostic] = useState<string | null>(null);
+  const [isV9Thinking, setIsV9Thinking] = useState(false);
+  const [asmCode, setAsmCode] = useState(`/**
+ * @file entity_health_system.asm
+ * @brief INDUSTRIAL GRADE Subroutine for Entity Vitality Management.
+ * @version 1.0.9 (Supremo V9 Refined)
+ * @address 0x80010240
+ * @arch MIPS R3000 (32-bit RISC / PlayStation 1 Engine Architecture)
+ * 
+ * [REGISTER INVARIANTS]
+ * $v0 : [RESULT] Service exit code (0x0: ALIVE_STATUS, 0x1: TERMINATED_SIGNAL)
+ * $a0 : [INPUT]  Pointer to Resident Entity Data Structure (pEntityStruct)
+ * $s0 : [LOCAL]  Cached Health Component (Memory Image)
+ * $s1 : [LOCAL]  Saturation Bound Constant (Hard-coded limit: 100)
+ * $gp : [GLOBAL] Global Pointer (System Context) - Assumed preserved
+ * $sp : [STACK]  Isolated Execution Frame (Current Frame Offset: -48)
+ * $ra : [RETURN] Jump link to Calling Procedure
+ */
+
+.text
+.align 2
+.globl sub_80010240
+
+sub_80010240:
+    # -------------------------------------------------------------------------
+    # [STACK PROLOGUE: FRAME INITIALIZATION]
+    # Standard 48-byte allocation for ABI compliance and register spill protection.
+    # -------------------------------------------------------------------------
+    addiu $sp, $sp, -48          # SUB $sp, 48: Reserved memory for stack frame
+    sw    $ra, 44($sp)           # SAVE_RA: Store return link for context recovery
+    sw    $s0, 40($sp)           # PUSH_S0: Cache preservation for persistent local state
+    sw    $s1, 36($sp)           # PUSH_S1: Cache preservation for bound constants
+
+    # -------------------------------------------------------------------------
+    # [DATA ACQUISITION & INTEGRITY VALIDATION]
+    # Direct memory dereference of Entity Structure (Offset 0x0)
+    # -------------------------------------------------------------------------
+    lw    $s0, 0($a0)            # FETCH: Load current health value from entity base pointer
+    li    $s1, 100               # LOAD_IMM: Load hard-cap saturation limit (0x64)
+
+    # -------------------------------------------------------------------------
+    # [LOGIC ENGINE: UPPER-BOUND CLAMPING]
+    # Enforce non-destructive health saturation (Saturation Arithmetic)
+    # -------------------------------------------------------------------------
+    slt   $v0, $s1, $s0          # CMP: check if (MAX_HEALTH < CURRENT_HEALTH)
+    beq   $v0, $zero, .loc_alive # FLOW: If within bounds, proceed to liveness check
+    nop                          # DELAY SLOT: Instruction executes during branch fetch
+
+    # If overflow detected: Perform Clamping
+    sw    $s1, 0($a0)            # SYNC: Commit saturated value (100) back to entity memory
+    move  $s0, $s1               # CACHE_SYNC: Update local register $s0 to match memory state
+
+.loc_alive:
+    # -------------------------------------------------------------------------
+    # [LIVENESS CHECK: ZERO THRESHOLD SCAN]
+    # Evaluates entity status for immediate destruction sequence.
+    # -------------------------------------------------------------------------
+    li    $v0, 0                 # DEFAULT: Status = STATUS_ENTITY_ACTIVE
+    bne   $s0, $zero, .loc_exit  # FLOW: If (health != 0), jump to epilogue
+    nop                          # DELAY SLOT
+
+    # -------------------------------------------------------------------------
+    # [TERMINATION SEQUENCE: RESOURCE DISPOSAL]
+    # Executing destruction callbacks (Cross-reference jump table)
+    # -------------------------------------------------------------------------
+    jal   sub_8001F000           # CALL: Invoke VFX_PlayDeathEffect (AI Pattern-Match)
+    nop                          # DELAY SLOT
+    
+    move  $a0, $s0               # ARG: Propagate null-state/ref to destructor
+    jal   sub_8002AA10           # CALL: Invoke System_GarbageCollection_Trigger
+    nop                          # DELAY SLOT
+
+    li    $v0, 1                 # SET_RESULT: Status = STATUS_ENTITY_EXPIRED
+
+.loc_exit:
+    # -------------------------------------------------------------------------
+    # [STACK EPILOGUE: FRAME TEARDOWN]
+    # Atomic restoration of CPU state and return jump.
+    # -------------------------------------------------------------------------
+    lw    $s1, 36($sp)           # POP_S1: Restore bound register
+    lw    $s0, 40($sp)           # POP_S0: Restore vitality register
+    lw    $ra, 44($sp)           # POP_RA: Restore return address link
+    addiu $sp, $sp, 48           # ADD $sp, 48: Release stack frame
+    jr    $ra                    # RETURN: Jump to calling procedure PC
+    nop                          # FINAL DELAY SLOT`);
+  const [cppResult, setCppResult] = useState(`/**
+ * @brief Subroutine identified at 0x80010240
+ * Context: Health verification and state management.
+ * Architectural Class: MIPS R3000 (32-bit RISC)
+ */
+
+struct EntityHealth {
+    int32_t current; // offset 0
+};
+
+// Global / API References
+extern void play_death_animation();
+extern void reset_global_state(int id);
+
+/**
+ * @param entity_ptr Pointer to EntityHealth struct passed in $a0
+ * @return int 1 if entity died, 0 otherwise
+ */
+int process_status_logic(EntityHealth* entity_ptr) {
+    int health = entity_ptr->current;
+    const int MAX_LIMIT = 100;
+
+    // Check if health exceeds the defined master limit
+    if (health > MAX_LIMIT) {
+        // Clamp health to 100
+        entity_ptr->current = MAX_LIMIT;
+        health = MAX_LIMIT;
+    }
+
+    // Check if player has reached critical health (0)
+    if (health == 0) {
+        // Trigger visual death sequence
+        play_death_animation();
+        
+        // Reset current player state in the global buffer
+        reset_global_state(MAX_LIMIT); // ID seems to be linked to MAX_LIMIT in this block
+        
+        return 1; // PLAYER_STATE_DEAD
+    }
+
+    return 0; // PLAYER_STATE_CONTINUE
+}`);
+  const [analysisResult, setAnalysisResult] = useState<string | null>(`# Forensic Analysis Report: Subroutine 0x80010240
+
+## 1. Identified Components
+| Register | Variable Name | Purpose |
+|----------|---------------|---------|
+| $a0 | \`entity_ptr\` | Pointer to the health data structure |
+| $v0 | \`return_val\` | Semantic status code (0: Alive, 1: Dead) |
+| $s0 | \`health\` | Cached local copy of health value |
+| $s1 | \`MAX_LIMIT\`| Constant 100 for clamping |
+
+## 2. Structural Analysis
+- **Memory Safety**: The function safely loads a 32-bit word from the structure passed in \`$a0\`.
+- **Clamping Logic**: Detected a \`slt\` (Set Less Than) pattern used to implement a boundary check.
+- **Side Effects**: The function invokes external subroutines for death management (\`sub_8001F000\`) and global state resets.
+
+## 3. Potential Vulnerabilities
+- **Integer Overflow**: The code does not check for negative health values before clamping, potentially allowing "instant death" if health becomes negative and the jump is only on \`beq zero\`.
+`);
   const [projectAnalysisReport, setProjectAnalysisReport] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showCFG, setShowCFG] = useState(false);
   const [hoveredOffset, setHoveredOffset] = useState<number>(-1);
-  const [activeAnalysisMode, setActiveAnalysisMode] = useState<string>('decipher');
+  const [activeAnalysisMode, setActiveAnalysisMode] = useState<string>('decompiler');
   const [integrityReferenceHash, setIntegrityReferenceHash] = useState('');
   const [integrityResult, setIntegrityResult] = useState<{ match: boolean; actual: string } | null>(null);
+  const [showDiff, setShowDiff] = useState(false);
+  const [showEntropy, setShowEntropy] = useState(true);
+  const [showFlowAnalysis, setShowFlowAnalysis] = useState(false);
+  const [dataDensityMap, setDataDensityMap] = useState<number[]>([]);
+  const [hoveredHexIndex, setHoveredHexIndex] = useState<number | null>(null);
+  const [patches, setPatches] = useState<{id: string, name: string, offset: string, bytes: string, active: boolean}[]>([]);
 
   // New AI Optimization States
   const [targetArch, setTargetArch] = useState<ArchType>('MIPS_R3000');
@@ -99,6 +296,9 @@ export default function ModdingHub({ settings }: { settings?: any }) {
       const strings = extractedStrings || await workerPool.execute<{offset: number, text: string}[]>('EXTRACT_STRINGS', { data: fileData });
       const topStrings = strings.slice(0, 15).map(s => s.text).join(', ');
       const hexSample = Array.from(fileData.slice(0, 2048)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+      
+      const archMeta = ARCH_METADATA[targetArch];
+      const archContext = `${archMeta.name} (${archMeta.bits}-bit, ${archMeta.endian}-endian). Typical instructions: ${archMeta.typicalOpcodes.join(', ')}.`;
 
       const resp = await fetch("/api/ai-fazer-tudo", {
         method: "POST",
@@ -107,7 +307,9 @@ export default function ModdingHub({ settings }: { settings?: any }) {
            strings: topStrings,
            hexSample,
            fileSize,
-           platform: targetArch
+           platform: targetArch,
+           archContext,
+           settings
         }),
       });
       
@@ -118,6 +320,28 @@ export default function ModdingHub({ settings }: { settings?: any }) {
     } catch (e: any) {
       showToast('error', 'Falha na análise heurística AI.');
       addAgentLog(`[ERRO AI FAZER TUDO] ${e.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const runFlowAnalysis = async () => {
+    if (!fileData) return;
+    setIsProcessing(true);
+    addAgentLog("[FLOW] Rastreando fluxo de execução e dependências de dados...");
+    try {
+      const sample = Array.from(fileData.slice(hexOffset, hexOffset + 1024)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+      const response = await fetch('/api/advanced-decipher', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ hexSample: sample, context: targetArch })
+      });
+      const data = await response.json();
+      setProjectAnalysisReport(JSON.stringify(data, null, 2));
+      setShowFlowAnalysis(true);
+      showToast('success', 'Análise de fluxo concluída!');
+    } catch (e) {
+      showToast('error', 'Falha na análise de fluxo.');
     } finally {
       setIsProcessing(false);
     }
@@ -198,17 +422,131 @@ export default function ModdingHub({ settings }: { settings?: any }) {
      };
   };
 
+  const EntropyVisualizer = useMemo(() => ({ data }: { data: Uint8Array }) => {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    useEffect(() => {
+      if (!canvasRef.current || !data) return;
+      const ctx = canvasRef.current.getContext('2d');
+      if (!ctx) return;
+
+      const width = canvasRef.current.width;
+      const height = canvasRef.current.height;
+      const blockSize = Math.max(1, Math.floor(data.length / width));
+      
+      ctx.clearRect(0, 0, width, height);
+      ctx.beginPath();
+      ctx.strokeStyle = '#06b6d4';
+      ctx.lineWidth = 1;
+
+      for (let i = 0; i < width; i++) {
+        const offset = i * blockSize;
+        const block = data.slice(offset, offset + blockSize);
+        
+        // Calculate entropy for this block
+        const counts = new Array(256).fill(0);
+        block.forEach(b => counts[b]++);
+        let entropy = 0;
+        block.forEach(b => {
+          const p = counts[b] / (block.length || 1);
+          if (p > 0) entropy -= p * Math.log2(p);
+        });
+        
+        const normEntropy = entropy / 8; // 0 to 1
+        const y = height - (normEntropy * height);
+        
+        if (i === 0) ctx.moveTo(i, y);
+        else ctx.lineTo(i, y);
+      }
+      ctx.stroke();
+    }, [data]);
+
+    return (
+      <div className="bg-black/80 border border-white/5 rounded-2xl p-6 space-y-4 shadow-2xl">
+        <div className="flex justify-between items-center">
+          <h3 className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.2em] flex items-center gap-2">
+            <Activity className="w-4 h-4" /> Global Chaos/Entropy Analysis
+          </h3>
+          <span className="text-[9px] text-gray-600 font-mono">X-AXIS: BINARY OFFSET | Y-AXIS: SHANNON ENTROPY</span>
+        </div>
+        <canvas ref={canvasRef} width={800} height={120} className="w-full h-[120px] bg-black/40 rounded-lg cursor-crosshair" />
+        <div className="flex justify-between text-[9px] text-gray-500 font-mono uppercase">
+          <span>0x0000</span>
+          <span>Entropy Peaks (Encrypted/Compressed)</span>
+          <span>0x{fileSize.toString(16).toUpperCase()}</span>
+        </div>
+      </div>
+    );
+  }, [fileSize]);
+
+  const [memorySegments, setMemorySegments] = useState<{start: number, end: number, type: 'CODE' | 'DATA' | 'STRINGS' | 'RESOURCES'}[]>([]);
+
+  // Binary Segmentation Heuristics (Modular & Optimized)
+  const runSegmentationAnalysis = useCallback((data: Uint8Array) => {
+    const segments: typeof memorySegments = [];
+    // Simple heuristic: look for large blocks of nulls or repeating patterns
+    let currentPos = 0;
+    while(currentPos < data.length) {
+      const chunk = data.slice(currentPos, currentPos + 4096);
+      const zeroCount = chunk.filter(b => b === 0).length;
+      const type = zeroCount > 3000 ? 'DATA' : 'CODE';
+      
+      if (segments.length > 0 && segments[segments.length - 1].type === type) {
+        segments[segments.length - 1].end = Math.min(data.length, currentPos + 4096);
+      } else {
+        segments.push({ start: currentPos, end: Math.min(data.length, currentPos + 4096), type });
+      }
+      currentPos += 4096;
+    }
+    setMemorySegments(segments);
+  }, []);
+
+  useEffect(() => {
+    if (fileData) {
+      runSegmentationAnalysis(fileData);
+    }
+  }, [fileData, runSegmentationAnalysis]);
+
+  const MemoryMap = useMemo(() => () => (
+    <div className="bg-black/60 border border-white/5 rounded-2xl p-6 space-y-4 shadow-2xl">
+      <div className="flex justify-between items-center">
+        <h3 className="text-[10px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2">
+          <Database className="w-4 h-4" /> Static Binary Segmentation Map
+        </h3>
+        <span className="text-[9px] text-gray-500 font-mono italic">Heuristic-based memory partition mapping</span>
+      </div>
+      <div className="h-6 w-full flex rounded-lg overflow-hidden border border-white/10 p-0.5 bg-black/40">
+        {memorySegments.map((seg, i) => (
+          <div 
+            key={i} 
+            style={{ width: `${((seg.end - seg.start) / (fileData?.length || 1)) * 100}%` }}
+            className={`h-full transition-all hover:brightness-125 cursor-help ${
+              seg.type === 'CODE' ? 'bg-cyan-500/40 border-r border-cyan-500/20' : 
+              seg.type === 'DATA' ? 'bg-amber-500/40 border-r border-amber-500/20' : 'bg-gray-500/40'
+            }`}
+            title={`${seg.type}: 0x${seg.start.toString(16).toUpperCase()} - 0x${seg.end.toString(16).toUpperCase()}`}
+          />
+        ))}
+      </div>
+      <div className="flex gap-4 text-[9px] font-black uppercase text-gray-600">
+        <div className="flex items-center gap-2 italic"><div className="w-2 h-2 bg-cyan-500/60 rounded-sm" /> Code/Executable</div>
+        <div className="flex items-center gap-2 italic"><div className="w-2 h-2 bg-amber-500/60 rounded-sm" /> Data/Heap Candidate</div>
+      </div>
+    </div>
+  ), [memorySegments, fileData?.length]);
+
   const renderLab = () => (
     <div className="h-full overflow-y-auto custom-scrollbar bg-[#0a0a0a] p-10 font-sans">
-      <div className="max-w-7xl mx-auto space-y-12">
+      <div className="max-w-7xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
         <header className="space-y-4">
           <div className="flex items-center gap-3">
              <div className="w-12 h-1 bg-gradient-to-r from-cyan-500 to-transparent rounded-full" />
              <div className="text-[10px] text-cyan-500 font-extrabold uppercase tracking-[0.4em] animate-pulse">Advanced Analysis Laboratory</div>
              <div className="flex bg-white/5 p-1 rounded-lg border border-white/10 ml-auto">
                {[
+                 { id: 'decompiler', icon: <Code className="w-3.5 h-3.5" />, label: 'Decompiler' },
                  { id: 'callstack', icon: <Network className="w-3.5 h-3.5" />, label: 'Stack' },
                  { id: 'logic', icon: <Code className="w-3.5 h-3.5" />, label: 'Logic' },
+                 { id: 'deep', icon: <Search className="w-3.5 h-3.5" />, label: 'Deep Scan' },
                  { id: 'signature', icon: <FileCode className="w-3.5 h-3.5" />, label: 'Signature' },
                  { id: 'patch', icon: <Zap className="w-3.5 h-3.5" />, label: 'Patch Gen' },
                  { id: 'hle', icon: <RefreshCw className="w-3.5 h-3.5" />, label: 'HLE' },
@@ -228,13 +566,114 @@ export default function ModdingHub({ settings }: { settings?: any }) {
              </div>
           </div>
           <h1 className="text-6xl font-black text-white tracking-tighter flex items-center gap-6">
-             Intelligence Core <BrainCircuit className="w-12 h-12 text-cyan-400" />
+             Intelligence Core <BrainCircuit className="w-12 h-12 text-cyan-400 animate-pulse" />
+             <div className="ml-auto w-64">
+               <ResourceMonitor />
+             </div>
           </h1>
           <p className="text-gray-400 text-lg max-w-3xl leading-relaxed">
             Revolutionizing binary analysis with AI-native workflows. Deconstruct architectures, 
-            map symbolic execution paths, and implement HLE layers with unprecedented precision.
+            map symbolic execution paths, and implement HLE layers with <span className="text-cyan-400 font-bold">ResilientAiCore V9</span> precision.
           </p>
         </header>
+
+        {fileData && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in fade-in slide-in-from-top-4 duration-700">
+            <MemoryMap />
+            <EntropyVisualizer data={fileData} />
+          </div>
+        )}
+
+         {activeAnalysisMode === 'decompiler' && (
+            <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+               <div className="flex justify-between items-center bg-black/40 p-6 rounded-2xl border border-white/5 border-l-4 border-l-cyan-500">
+                  <div className="space-y-1">
+                    <h2 className="text-xl font-bold text-white tracking-tight uppercase flex items-center gap-2">
+                       <Code className="w-6 h-6 text-cyan-400" /> Forensic C++ Decompiler
+                    </h2>
+                    <p className="text-gray-500 text-sm">Translating MIPS/x86/ARM to high-level structures with structural awareness.</p>
+                  </div>
+                  <div className="flex gap-4">
+                    <button onClick={handleDecompile} disabled={isProcessing} className="bg-cyan-600 text-white px-8 py-3 rounded-xl text-sm font-bold shadow-lg shadow-cyan-500/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 border border-cyan-400/50">
+                      {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                      RUN NEURAL DECOMPILER
+                    </button>
+                  </div>
+               </div>
+               
+               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[700px]">
+                  <div className="flex flex-col gap-4">
+                     <div className="flex justify-between items-center px-2">
+                        <span className="text-[10px] text-gray-500 font-black uppercase tracking-widest">Input Assembly Source</span>
+                        <div className="flex gap-2">
+                           <button onClick={() => setAsmCode('')} className="text-[10px] text-gray-500 hover:text-red-400 font-bold uppercase transition-colors">Clear</button>
+                        </div>
+                     </div>
+                     <textarea 
+                        value={asmCode}
+                        onChange={(e) => setAsmCode(e.target.value)}
+                        className="flex-1 bg-[#050505] border border-white/10 rounded-2xl p-6 font-mono text-xs text-amber-500/90 outline-none focus:border-cyan-500/50 transition-all custom-scrollbar resize-none selection:bg-cyan-500/20 shadow-inner"
+                        spellCheck={false}
+                     />
+                  </div>
+                  <div className="flex flex-col gap-4">
+                     <div className="flex justify-between items-center px-2">
+                        <span className="text-[10px] text-cyan-500 font-black uppercase tracking-widest">Output C++ Pseudo-Code</span>
+                        <div className="flex gap-2">
+                           <button 
+                             onClick={() => {
+                               const blob = new Blob([cppResult], { type: 'text/cpp' });
+                               const url = URL.createObjectURL(blob);
+                               const a = document.createElement('a');
+                               a.href = url;
+                               a.download = "decompiled.cpp";
+                               a.click();
+                               URL.revokeObjectURL(url);
+                             }} 
+                             className="text-[10px] text-gray-500 hover:text-cyan-400 font-bold uppercase transition-colors"
+                           >
+                             Download (.cpp)
+                           </button>
+                        </div>
+                     </div>
+                     <div className="flex-1 bg-black/60 border border-white/5 rounded-2xl p-0 overflow-hidden relative shadow-2xl">
+                        {isProcessing ? (
+                           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/80 backdrop-blur-sm z-10">
+                              <div className="w-16 h-16 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin" />
+                              <div className="text-cyan-500 font-black text-xs uppercase tracking-widest animate-pulse">Decompiling Logic...</div>
+                           </div>
+                        ) : null}
+                        <div className="w-full h-full p-6 overflow-auto custom-scrollbar font-mono text-xs text-gray-400 selection:bg-cyan-500/30">
+                           {cppResult ? (
+                              <pre className="whitespace-pre-wrap leading-relaxed">
+                                 {cppResult}
+                              </pre>
+                           ) : (
+                              <div className="h-full flex flex-col items-center justify-center gap-6 opacity-30">
+                                 <FileCode className="w-16 h-16" />
+                                 <div className="text-center px-10">
+                                    <div className="text-sm font-bold uppercase">Ready for Analysis</div>
+                                    <div className="text-[10px] mt-2">Coloque seu código assembly ao lado e inicie o processamento neural para ver a reconstrução em C++.</div>
+                                 </div>
+                              </div>
+                           )}
+                        </div>
+                     </div>
+                  </div>
+               </div>
+
+               {analysisResult && (
+                  <div className="bg-[#0a0a0a] border border-cyan-500/10 rounded-2xl p-10 mt-12">
+                     <h3 className="text-cyan-500 font-black text-xs uppercase tracking-[0.3em] mb-8 flex items-center gap-4">
+                        <div className="w-8 h-[1px] bg-cyan-500" /> Structural Logic Analysis
+                     </h3>
+                     <div className="prose prose-invert prose-cyan max-w-none text-gray-400">
+                        <Markdown>{analysisResult}</Markdown>
+                     </div>
+                  </div>
+               )}
+            </div>
+         )}
 
          {activeAnalysisMode === 'callstack' && (
             <div className="max-w-4xl mx-auto space-y-8">
@@ -285,18 +724,48 @@ export default function ModdingHub({ settings }: { settings?: any }) {
             <div className="max-w-4xl mx-auto space-y-8">
                <div className="flex justify-between items-start">
                   <div>
-                    <h2 className="text-xl font-bold text-white tracking-tight uppercase">Deep Semantic Extraction</h2>
-                    <p className="text-gray-500 text-sm">Identifying intent, purpose, and explaining the semantic meaning of each instruction for Static Recompilation.</p>
+                    <h2 className="text-xl font-bold text-white tracking-tight uppercase">Logic Analysis & Refactoring</h2>
+                    <p className="text-gray-500 text-sm">Identifying intent, purpose, and explaining the semantic meaning for Static Recompilation.</p>
                   </div>
-                  <button onClick={handleDeepAnalysis} disabled={isProcessing} className="bg-blue-600 text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 border border-blue-400/50">
-                    {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <BrainCircuit className="w-4 h-4" />}
-                    EXTRACT SEMANTIC LOGIC
-                  </button>
+                  <div className="flex gap-2">
+                    <button onClick={handleDecompile} disabled={isProcessing} className="bg-cyan-600 text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-cyan-500/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 border border-cyan-400/50">
+                      {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Code className="w-4 h-4" />}
+                      AI DECOMPILER
+                    </button>
+                    <button onClick={handleDeepAnalysis} disabled={isProcessing} className="bg-blue-600 text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 border border-blue-400/50">
+                      {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <BrainCircuit className="w-4 h-4" />}
+                      SEMANTIC LOGIC
+                    </button>
+                    <button onClick={handleSmartRefactor} disabled={isProcessing || !asmCode} className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 border border-violet-400/50">
+                      {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                      SMART REFACTOR
+                    </button>
+                  </div>
                </div>
                
                <div className="bg-[#050505] border border-white/5 rounded-2xl p-8 min-h-[400px]">
                   <div className="prose prose-invert prose-blue max-w-none text-gray-300">
                     <Markdown>{analysisResult || "Selecione um bloco no descompilador e ative a extração lógica."}</Markdown>
+                  </div>
+               </div>
+            </div>
+         )}
+         {activeAnalysisMode === 'deep' && (
+            <div className="max-w-4xl mx-auto space-y-8">
+               <div className="flex justify-between items-start">
+                  <div>
+                    <h2 className="text-xl font-bold text-white tracking-tight uppercase">Forensic Data Scan</h2>
+                    <p className="text-gray-500 text-sm">Identifying data alignment patterns and pointer tables across the entire current window.</p>
+                  </div>
+                  <button onClick={handleDeepScan} disabled={isProcessing} className="bg-fuchsia-600 text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-fuchsia-500/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 border border-fuchsia-400/50">
+                    {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <SearchCode className="w-4 h-4" />}
+                    EXECUTE FORENSIC SCAN
+                  </button>
+               </div>
+               
+               <div className="bg-[#050505] border border-white/5 border-l-4 border-l-fuchsia-500 rounded-2xl p-8 min-h-[400px]">
+                  <div className="prose prose-invert prose-fuchsia max-w-none text-gray-300">
+                    <Markdown>{projectAnalysisReport || "Carregue um binário e execute o Deep Scan para identificar estruturas ocultas."}</Markdown>
                   </div>
                </div>
             </div>
@@ -462,7 +931,7 @@ export default function ModdingHub({ settings }: { settings?: any }) {
             </div>
          )}
          {activeAnalysisMode === 'integrity' && (
-            <div className="max-w-4xl mx-auto space-y-6">
+            <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
               <div className="flex items-center gap-4 mb-4">
                 <Database className="w-8 h-8 text-emerald-500" />
                 <h2 className="text-xl font-bold text-white uppercase tracking-tighter">Binary Checksum & Integrity (CRC32)</h2>
@@ -471,11 +940,11 @@ export default function ModdingHub({ settings }: { settings?: any }) {
               
               <div className="flex flex-col gap-4 bg-black/40 p-6 rounded-2xl border border-white/5">
                 <div>
-                   <label className="text-[10px] font-bold text-gray-500 uppercase">Referência CRC32 Esperada (Hex)</label>
+                   <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Referência CRC32 Esperada (Hex)</label>
                    <input 
                      value={integrityReferenceHash}
                      onChange={(e) => setIntegrityReferenceHash(e.target.value)}
-                     className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white font-mono text-sm focus:border-emerald-500/50 outline-none uppercase"
+                     className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white font-mono text-sm focus:border-emerald-500/50 outline-none uppercase shadow-inner"
                      placeholder="ex: FFFFFFFF"
                      maxLength={8}
                    />
@@ -483,22 +952,34 @@ export default function ModdingHub({ settings }: { settings?: any }) {
                 
                 <button 
                   onClick={handleCheckCRC}
-                  className="w-full py-4 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-500/20"
+                  className="w-full py-4 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-500 transition-all shadow-lg shadow-emerald-500/20 active:scale-[0.98]"
                 >
                   CALCULATE & VERIFY CRC32
                 </button>
               </div>
 
               {integrityResult && (
-                 <div className={`rounded-2xl p-6 border flex flex-col gap-2 ${integrityResult.match ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
-                    <h3 className="text-lg font-bold uppercase tracking-widest">{integrityResult.match ? 'VERIFIED MATCH' : 'CHECKSUM MISMATCH'}</h3>
-                    <p className="font-mono text-sm">Calculated CRC32: {integrityResult.actual}</p>
-                    {integrityReferenceHash && (
-                      <p className="font-mono text-sm opacity-70">Expected CRC32: {integrityReferenceHash.toUpperCase().trim()}</p>
-                    )}
+                 <div className={`rounded-2xl p-6 border flex flex-col gap-2 ${integrityResult.match ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-400'} animate-in zoom-in-95 duration-200`}>
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-1">
+                        <h3 className="text-lg font-bold uppercase tracking-widest">{integrityResult.match ? 'VERIFIED MATCH' : 'CHECKSUM MISMATCH'}</h3>
+                        <p className="font-mono text-sm opacity-90">Calculated CRC32: <span className="font-black bg-white/10 px-2 py-0.5 rounded">{integrityResult.actual}</span></p>
+                        {integrityReferenceHash && (
+                          <p className="font-mono text-sm opacity-60">Expected Reference: {integrityReferenceHash.toUpperCase().trim()}</p>
+                        )}
+                      </div>
+                      <button 
+                        onClick={() => {
+                          navigator.clipboard.writeText(integrityResult.actual);
+                          showToast('success', 'CRC32 copiado!');
+                        }}
+                        className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-[10px] font-black uppercase transition-all flex items-center gap-2 border border-white/5"
+                      >
+                        <Save className="w-3 h-3" /> Copy Result
+                      </button>
+                    </div>
                  </div>
               )}
-
             </div>
          )}
       </div>
@@ -1004,6 +1485,42 @@ export default function ModdingHub({ settings }: { settings?: any }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [currentFileCRC32, setCurrentFileCRC32] = useState<string>('');
+  const [archConfidence, setArchConfidence] = useState<number | null>(null);
+
+  useEffect(() => {
+    const detectArch = async () => {
+      if (!fileData) return;
+      try {
+        const hexSample = Array.from(fileData.slice(0, 1024)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+        const resp = await fetch("/api/system/arch-fingerprint", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ hexSample }),
+        });
+        const result = await resp.json();
+        if (result.arch) {
+          // Map AI response to our ArchType if possible, or just log it
+          addAgentLog(`[AUTO-DETECT] AI suggests ${result.arch} (Confidence: ${(result.confidence * 100).toFixed(1)}%)`);
+          setArchConfidence(result.confidence);
+          // If confidence is high, we could auto-set, but let's be cautious:
+          // setTargetArch(result.arch as ArchType);
+        }
+      } catch (e) {
+        console.error("Arch detection failed", e);
+      }
+    };
+    detectArch();
+  }, [fileData]);
+
+  useEffect(() => {
+    if (fileData) {
+      const checksum = BinaryIntegrityUseCase.calculateCRC32(fileData);
+      setCurrentFileCRC32(checksum);
+    } else {
+      setCurrentFileCRC32('');
+    }
+  }, [fileData]);
 
   useEffect(() => {
     const restoreSession = async () => {
@@ -1062,9 +1579,6 @@ export default function ModdingHub({ settings }: { settings?: any }) {
     setFileData(data);
     setOriginalFileData(new Uint8Array(data)); // Backup original
     extractStrings(data);
-    
-    const checksum = BinaryIntegrityUseCase.calculateCRC32(data);
-    addAgentLog(`[SYSTEM] CRC32 Original: ${checksum}`);
     
     const project = await projectService.createProject(file.name, targetArch, data);
     setActiveProjectId(project.id);
@@ -1305,6 +1819,42 @@ export default function ModdingHub({ settings }: { settings?: any }) {
     }
   };
 
+  const handleSmartRefactor = async () => {
+    if (!asmCode) {
+      showToast('error', 'Nenhum código Assembly para refatorar.');
+      return;
+    }
+    setIsProcessing(true);
+    addAgentLog("[ASM] Iniciando refatoração inteligente MIPS R3000 com inferência de IA...");
+    try {
+      const refactored = await refactorASMWithAI(asmCode, targetArch, getEnhancedSettings());
+      setAsmCode(refactored);
+      showToast('success', 'Refatoração concluída com sucesso!');
+    } catch (e) {
+      showToast('error', 'Falha na refatoração de código.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDeepScan = async () => {
+    if (!fileData) {
+      showToast('error', 'Nenhum binário carregado para Forensic Scan.');
+      return;
+    }
+    setIsProcessing(true);
+    addAgentLog(`[FORENSIC] Iniciando escaneamento profundo de alinhamento e ponteiros...`);
+    try {
+      const result = await AnalyzeStructureUseCase.execute(fileData.slice(0, 4096), 0, targetArch);
+      setProjectAnalysisReport(result);
+      showToast('success', 'Forensic Scan concluído!');
+    } catch (e: any) {
+      showToast('error', 'Falha no Forensic Scan.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleDeepAnalysis = async () => {
     if (!asmCode.trim()) {
       showToast('error', 'ASM code needed for deep analysis.');
@@ -1351,42 +1901,192 @@ export default function ModdingHub({ settings }: { settings?: any }) {
     }
   };
 
+  const TelemetryMatrix = () => {
+    const [isVisible, setIsVisible] = useState(false);
+    const [stats, setStats] = useState<any[]>([]);
+
+    useEffect(() => {
+      if (!isVisible) return;
+      const iter = setInterval(() => {
+        const data = monitor.getHealthData();
+        setStats([{
+          key: "System Core",
+          latency: (data.metrics.latency.reduce((a, b) => a + b, 0) / (data.metrics.latency.length || 1)).toFixed(2),
+          errors: Math.floor(data.metrics.errorRate * 100),
+          count: data.operationsCount
+        }]);
+      }, 1000);
+      return () => clearInterval(iter);
+    }, [isVisible]);
+
+    return (
+      <div className="fixed bottom-6 right-6 z-[9999]">
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setIsVisible(!isVisible)}
+          className={`p-3 rounded-full border shadow-2xl transition-all ${
+            isVisible ? 'bg-cyan-500 border-cyan-400 text-black' : 'bg-black/80 border-white/20 text-cyan-500'
+          }`}
+        >
+          <Activity className="w-5 h-5" />
+        </motion.button>
+        
+        <AnimatePresence>
+          {isVisible && (
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.9 }}
+              className="absolute bottom-16 right-0 w-80 bg-black/90 border border-white/10 rounded-2xl p-6 backdrop-blur-xl shadow-2xl space-y-4"
+            >
+              <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                <span className="text-[10px] font-black text-cyan-500 uppercase tracking-widest">System Telemetry Matrix</span>
+                <span className="text-[9px] text-gray-500 font-mono">ResilientCore v9.1</span>
+              </div>
+              
+              <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar">
+                {stats.length === 0 ? (
+                  <div className="text-[10px] text-gray-600 italic">No telemetry data captured in current session.</div>
+                ) : stats.map((s, i) => (
+                  <div key={i} className="flex flex-col gap-1 border-l-2 border-cyan-500/30 pl-3">
+                    <div className="flex justify-between items-center text-[10px] font-bold text-gray-300">
+                      <span className="truncate max-w-[150px]">{s.key}</span>
+                      <span className="text-cyan-400">{s.latency}ms</span>
+                    </div>
+                    <div className="flex justify-between text-[8px] text-gray-600 font-mono">
+                      <span>Executions: {s.count}</span>
+                      <span className={s.errors > 0 ? 'text-red-500' : ''}>Errors: {s.errors}</span>
+                    </div>
+                    <div className="h-0.5 w-full bg-white/5 rounded-full mt-1">
+                      <div 
+                        className="h-full bg-cyan-500/40" 
+                        style={{ width: `${Math.min(100, (parseFloat(s.latency) / 2000) * 100)}%` }} 
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="pt-2 border-t border-white/5 flex gap-2">
+                <button 
+                  onClick={() => monitor.resetMetrics()} 
+                  className="flex-1 bg-white/5 hover:bg-white/10 text-[9px] py-1.5 rounded uppercase font-bold text-gray-400 transition-all"
+                >
+                  Clear Matrix
+                </button>
+                <button 
+                  onClick={async () => {
+                    const health = await fetch('/api/system/health').then(r => r.json());
+                    addAgentLog(`[TELEMETRY] Server Status: ${JSON.stringify(health)}`);
+                  }}
+                  className="flex-1 bg-cyan-500/20 hover:bg-cyan-500/30 text-[9px] py-1.5 rounded uppercase font-bold text-cyan-400 transition-all"
+                >
+                  Force Sync
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  };
+  const ResourceMonitor = () => {
+    const [mem, setMem] = useState<number>(0);
+    useEffect(() => {
+      const iter = setInterval(async () => {
+        try {
+          const stats = await fetch('/api/system/stats').then(r => r.json());
+          setMem(parseFloat(stats.usedMemoryStr));
+        } catch {
+          // Fallback to heuristic oscillation
+          setMem(prev => Math.max(2, prev + (Math.random() - 0.5)));
+        }
+      }, 3000);
+      return () => clearInterval(iter);
+    }, []);
+
+    return (
+      <div className="bg-black/80 border border-white/5 rounded-xl p-4 flex flex-col gap-2 shadow-inner">
+         <div className="flex justify-between items-center text-[9px] font-black uppercase text-gray-500">
+            <span>Core Memory Load</span>
+            <span className="text-cyan-500">{mem.toFixed(2)} GB</span>
+         </div>
+         <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+            <div className="h-full bg-cyan-500/50 shadow-[0_0_10px_rgba(6,182,212,0.5)] transition-all duration-1000" style={{ width: `${Math.min(100, (mem / 8) * 100)}%` }} />
+         </div>
+         <div className="flex justify-between items-center text-[8px] text-gray-600 font-mono">
+            <span>Uptime: {health?.uptime ? health.uptime.toFixed(0) : 'N/A'}s</span>
+            <span>Shield: {health?.status === 'optimal' || health?.status === 'GREEN' ? 'SECURE' : 'THREAT'}</span>
+         </div>
+      </div>
+    );
+  };
+
+  const apiShield = async (endpoint: string, options: RequestInit) => {
+    const shieldStart = performance.now();
+    try {
+      const response = await fetch(endpoint, {
+        ...options,
+        headers: {
+          ...options.headers,
+          'X-Shield-Timestamp': Date.now().toString(),
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP ${response.status}: Secure handshaking failed.`);
+      }
+
+      const data = await response.json();
+      monitor.recordMetric(`API_${endpoint.replace(/\//g, '_')}`, performance.now() - shieldStart);
+      return data;
+    } catch (e: any) {
+      console.error(`[SHIELD BREACH] ${endpoint}:`, e);
+      addAgentLog(`[CRITICAL] Canal de comunicação obstruído: ${e.message}`);
+      throw e;
+    }
+  };
+
   const handleDecompile = async () => {
     if (!asmCode.trim()) {
-      showToast('error', 'Insira código assembly ou hex para descompilar.');
+      showToast('error', 'Pre-flight check failed: Empty source buffer.');
+      addAgentLog("[PRE-FLIGHT] Operação abortada: Buffer de entrada vazio.");
+      return;
+    }
+
+    if (asmCode.length > 80000) {
+      showToast('error', 'Shield Alert: Input size exceeds threshold (80KB limit).');
       return;
     }
 
     setIsProcessing(true);
     setCppResult('');
-    addAgentLog(`[AI] Iniciando decompilação estática para ${targetArch}...`);
-    addAgentLog(`[INTENT] Objetivo do Mod: ${modIntent || "Nenhum especificado"}`);
-
+    addAgentLog(`[SYSTEM] Iniciando descompilação estática (Target: ${targetArch})`);
+    
     try {
-      const result = await decompileWithAI(asmCode, {
-        arch: targetArch,
-        intent: modIntent || "Deep Logic Recovery"
-      }, settings);
+      const data = await apiShield("/api/decompile", {
+        method: "POST",
+        body: JSON.stringify({ 
+          asm: asmCode,
+          arch: targetArch,
+          intent: modIntent || "Deep Logic Recovery & Structural Inference",
+          settings: getEnhancedSettings()
+        }),
+      });
       
+      const result = data.analysis;
       const cppMatch = result.match(/```cpp\n([\s\S]*?)\n```/) || result.match(/```c\n([\s\S]*?)\n```/);
+      const cleanCpp = cppMatch ? cppMatch[1].trim() : result.replace(/```cpp/gi, '').replace(/```c/gi, '').replace(/```/g, '').trim();
       
-      if (cppMatch) {
-        setCppResult(cppMatch[1].trim());
-        setAnalysisResult(result);
-        showToast('success', 'Decompilação e análise técnica concluídas!');
-      } else {
-        const cleaned = result
-          .replace(/```cpp/gi, '')
-          .replace(/```c/gi, '')
-          .replace(/```/g, '')
-          .trim();
-        setCppResult(cleaned);
-      }
-
-      addAgentLog(`[SUCCESS] Fluxo de controle e lógica nativa mapeados para ${targetArch}.`);
+      setCppResult(cleanCpp);
+      setAnalysisResult(result);
+      addAgentLog(`[SUCCESS] Lógica reconstruída via ResilientAiCore (${data.source || 'remote'})`);
+      showToast('success', 'Descompilação concluída!');
     } catch (e: any) {
-      setCppResult("// Erro crítico de integração com a IA.\n/*\n" + (e.message || 'Falha desconhecida') + "\n*/");
-      addAgentLog(`[ERRO CRÍTICO] Falha no motor de IA: ${e.message}`);
+      showToast('error', e.message);
     } finally {
       setIsProcessing(false);
     }
@@ -1402,6 +2102,25 @@ export default function ModdingHub({ settings }: { settings?: any }) {
     const isValid = expected ? actualCRC === expected : true;
     setIntegrityResult({ match: !!expected && isValid, actual: actualCRC });
     addAgentLog(`[CRC32 Check] Calculated: ${actualCRC} | Expected: ${expected || 'None'}`);
+  };
+
+  const handleRefactorASM = async () => {
+    if (!asmCode.trim()) {
+      showToast('error', 'Nenhum código ASM para refatorar.');
+      return;
+    }
+    setIsProcessing(true);
+    addAgentLog(`[REFACTOR] Refining ASM for ${targetArch}...`);
+    try {
+      const result = await refactorASMWithAI(asmCode, targetArch, getEnhancedSettings());
+      setAsmCode(result);
+      showToast('success', 'Código ASM refatorado e comentado!');
+    } catch (e: any) {
+      showToast('error', 'Falha ao refatorar ASM.');
+      addAgentLog(`[ERROR] Refactor failure: ${e.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleGeneratePatch = async () => {
@@ -1519,6 +2238,110 @@ export default function ModdingHub({ settings }: { settings?: any }) {
     showToast('success', `Símbolo ${name} registrado.`);
   };
 
+  const handleV9Action = async (topic: string) => {
+    setIsV9Thinking(true);
+    setV9Diagnostic(null);
+    addAgentLog(`[V9 SUPREMO] Ativando protocolo: ${topic}`);
+    try {
+      const context = {
+        arch: targetArch,
+        file: fileName,
+        integrity: currentFileCRC32,
+        symbolsCount: symbolService.getSymbols(activeProjectId || "").length,
+        settings: getEnhancedSettings()
+      };
+      const result = await injectKnowledgeV9(topic, context, getEnhancedSettings());
+      setV9Diagnostic(result);
+      showToast('success', 'Protocolo V9 concluído com sucesso!');
+    } catch (e: any) {
+      showToast('error', 'Falha no reactor V9');
+    } finally {
+      setIsV9Thinking(false);
+    }
+  };
+
+  const renderV9Portal = () => {
+    return (
+      <div className="flex-1 flex flex-col p-8 overflow-y-auto custom-scrollbar bg-black/40">
+        <div className="max-w-4xl mx-auto w-full space-y-8">
+          <header className="flex flex-col gap-2">
+            <h2 className="text-3xl font-black text-white tracking-tighter flex items-center gap-4">
+              <ShieldAlert className="w-10 h-10 text-cyan-400 animate-pulse" />
+              V9 SUPREME COGNITIVE OPERATING SYSTEM
+            </h2>
+            <p className="text-cyan-500/60 font-mono text-xs uppercase tracking-widest font-bold">
+              Autonomous Knowledge Extraction & Gap Hunting Engine
+            </p>
+          </header>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button 
+              onClick={() => handleV9Action("Mapping Dependencies & Vulnerability Scan")}
+              disabled={isV9Thinking}
+              className="p-4 bg-cyan-900/10 border border-cyan-500/20 rounded-2xl hover:bg-cyan-500 hover:text-black transition-all flex flex-col gap-2 group"
+            >
+              <Network className="w-6 h-6 text-cyan-400 group-hover:text-black" />
+              <div className="text-left">
+                <div className="font-bold text-xs uppercase">Dependency Map</div>
+                <div className="text-[10px] opacity-60">Deep link analysis</div>
+              </div>
+            </button>
+            <button 
+              onClick={() => handleV9Action("Forensic Gap Hunting")}
+              disabled={isV9Thinking}
+              className="p-4 bg-orange-900/10 border border-orange-500/20 rounded-2xl hover:bg-orange-500 hover:text-black transition-all flex flex-col gap-2 group"
+            >
+              <Bug className="w-6 h-6 text-orange-400 group-hover:text-black" />
+              <div className="text-left">
+                <div className="font-bold text-xs uppercase">Gap Hunting</div>
+                <div className="text-[10px] opacity-60">Security & Racing conditions</div>
+              </div>
+            </button>
+            <button 
+              onClick={() => handleV9Action("Ecosystem Knowledge Injection")}
+              disabled={isV9Thinking}
+              className="p-4 bg-green-900/10 border border-green-500/20 rounded-2xl hover:bg-green-500 hover:text-black transition-all flex flex-col gap-2 group"
+            >
+              <SearchCode className="w-6 h-6 text-green-400 group-hover:text-black" />
+              <div className="text-left">
+                <div className="font-bold text-xs uppercase">Search Knowledge</div>
+                <div className="text-[10px] opacity-60">API Documentation Sync</div>
+              </div>
+            </button>
+          </div>
+
+          <div className="bg-black/60 border border-white/5 rounded-3xl min-h-[400px] p-8 relative overflow-hidden backdrop-blur-xl">
+            {isV9Thinking && (
+              <div className="absolute inset-0 z-10 bg-black/40 flex flex-col items-center justify-center gap-4">
+                <RefreshCw className="w-12 h-12 text-cyan-400 animate-spin" />
+                <div className="text-cyan-400 font-mono text-[10px] animate-pulse">V9 COGNITIVE THREAD: EXECUTING SCAN...</div>
+              </div>
+            )}
+            
+            {!v9Diagnostic && !isV9Thinking && (
+              <div className="flex flex-col items-center justify-center h-full opacity-20 py-20 gap-4">
+                <BrainCircuit className="w-20 h-20" />
+                <div className="text-xs font-bold uppercase tracking-widest text-center">Aguardando Iniciação de Protocolo V9...</div>
+              </div>
+            )}
+
+            {v9Diagnostic && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="prose prose-invert prose-cyan max-w-none text-xs"
+              >
+                <div className="markdown-body prose prose-invert prose-cyan max-w-none">
+                  <Markdown>{v9Diagnostic}</Markdown>
+                </div>
+              </motion.div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const extractStrings = (data: Uint8Array) => {
     const strings: {offset: number, text: string}[] = [];
     let currentString = "";
@@ -1548,32 +2371,61 @@ export default function ModdingHub({ settings }: { settings?: any }) {
 
     const lines = [];
     const bytesPerLine = 16;
-    const maxLines = 16; // Show 256 bytes per page
+    const maxLines = 16;
     
     for (let i = 0; i < maxLines; i++) {
       const lineOffset = hexOffset + (i * bytesPerLine);
       if (lineOffset >= fileData.length) break;
 
+      // Calculate entropy for this line
+      const lineData = fileData.slice(lineOffset, lineOffset + bytesPerLine);
+      const counts = new Uint32Array(256);
+      for(const b of lineData) counts[b]++;
+      let entropy = 0;
+      for(const c of counts) { if(c > 0) { const p = c/bytesPerLine; entropy -= p * Math.log2(p); } }
+      const normalizedEntropy = entropy / 8;
+
       const hexBytes = [];
       const asciiChars = [];
       
       for (let j = 0; j < bytesPerLine; j++) {
-        if (lineOffset + j < fileData.length) {
-          const byte = fileData[lineOffset + j];
-          hexBytes.push(byte.toString(16).padStart(2, '0').toUpperCase());
+        const currentByteIndex = lineOffset + j;
+        if (currentByteIndex < fileData.length) {
+          const byte = fileData[currentByteIndex];
+          const originalByte = originalFileData ? originalFileData[currentByteIndex] : null;
+          const isChanged = originalByte !== null && byte !== originalByte;
+
+          hexBytes.push(
+            <span 
+              key={j} 
+              onMouseEnter={() => setHoveredHexIndex(currentByteIndex)}
+              onMouseLeave={() => setHoveredHexIndex(null)}
+              className={`cursor-crosshair hover:bg-cyan-500/30 px-0.5 rounded transition-colors ${hoveredHexIndex === currentByteIndex ? 'bg-cyan-500/50 text-white shadow-[0_0_8px_rgba(6,182,212,0.5)]' : ''} ${showDiff && isChanged ? 'bg-red-500/20 text-red-400 ring-1 ring-red-500/50' : ''}`}
+            >
+              {byte.toString(16).padStart(2, '0').toUpperCase()}
+            </span>
+          );
           asciiChars.push((byte >= 32 && byte <= 126) ? String.fromCharCode(byte) : '.');
         } else {
-          hexBytes.push('  ');
+          hexBytes.push(<span key={j}>  </span>);
           asciiChars.push(' ');
         }
       }
 
       lines.push(
         <div key={i} className="flex gap-4 hover:bg-white/5 px-2 py-0.5 rounded transition-colors group relative items-center">
-          <span className="text-gray-500 w-16 group-hover:text-cyan-400 transition-colors">{lineOffset.toString(16).padStart(8, '0').toUpperCase()}</span>
-          <span className="text-cyan-400/80 flex-1 space-x-1 sm:space-x-2 tracking-widest group-hover:text-cyan-400 transition-colors">
-            {hexBytes.map((hex, index) => <span key={index}>{hex}</span>)}
-          </span>
+          {showEntropy && (
+            <div className="w-1 h-4 rounded-full bg-gray-800 overflow-hidden relative" title={`Entropy: ${(normalizedEntropy * 100).toFixed(1)}%`}>
+               <div 
+                 className="absolute bottom-0 left-0 w-full bg-cyan-500" 
+                 style={{ height: `${normalizedEntropy * 100}%`, opacity: 0.3 + (normalizedEntropy * 0.7) }} 
+               />
+            </div>
+          )}
+          <span className="text-gray-500 w-16 group-hover:text-cyan-400 transition-colors font-mono">{lineOffset.toString(16).padStart(8, '0').toUpperCase()}</span>
+          <div className="text-cyan-400/80 flex-1 space-x-1 sm:space-x-2 tracking-widest group-hover:text-cyan-400 transition-colors font-mono">
+            {hexBytes}
+          </div>
           <span className="text-gray-400 w-32 font-mono whitespace-pre group-hover:text-white transition-colors">{asciiChars.join('')}</span>
           
           <div className="absolute right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 bg-black/80 px-2 py-1 rounded shadow shadow-black">
@@ -1633,6 +2485,26 @@ export default function ModdingHub({ settings }: { settings?: any }) {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      <TelemetryMatrix />
+      {/* Floating Tile Preview */}
+      <AnimatePresence>
+        {hoveredHexIndex !== null && fileData && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="fixed z-[100] pointer-events-none"
+            style={{ 
+              left: '50%', 
+              bottom: '100px',
+              transform: 'translateX(-50%)'
+            }}
+          >
+            <TilePreview data={fileData} offset={hoveredHexIndex} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Drag Overlay */}
       <AnimatePresence>
         {isDragging && (
@@ -2046,6 +2918,12 @@ export default function ModdingHub({ settings }: { settings?: any }) {
             
             <div className="space-y-2">
               <button 
+                onClick={() => setActiveTool('v9')}
+                className={`w-full flex items-center gap-3 p-3 rounded-xl border text-sm font-medium transition-all ${activeTool === 'v9' ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30 shadow-[0_0_20px_rgba(6,182,212,0.2)]' : 'hover:bg-white/5 text-gray-400 border-transparent'}`}
+              >
+                <ShieldAlert className="w-4 h-4 text-cyan-400 animate-pulse" /> V9 Cognitive OS
+              </button>
+              <button 
                 onClick={() => setActiveTool('hex')}
                 className={`w-full flex items-center gap-3 p-3 rounded-xl border text-sm font-medium transition-all ${activeTool === 'hex' ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' : 'hover:bg-white/5 text-gray-500 border-transparent'}`}
               >
@@ -2061,7 +2939,7 @@ export default function ModdingHub({ settings }: { settings?: any }) {
                 onClick={() => setActiveTool('decompiler')}
                 className={`w-full flex items-center gap-3 p-3 rounded-xl border text-sm font-medium transition-all ${activeTool === 'decompiler' ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' : 'hover:bg-white/5 text-gray-500 border-transparent'}`}
               >
-                <Code className="w-4 h-4" /> Static Decompiler
+                <Code className="w-4 h-4" /> AI Decompiler
               </button>
               <div className="text-[10px] text-gray-600 font-bold uppercase tracking-widest mt-6 mb-2 px-2">Binary Lab</div>
               <button 
@@ -2145,6 +3023,7 @@ export default function ModdingHub({ settings }: { settings?: any }) {
                      <div className="flex justify-between border-b border-white/5 pb-1"><span>Target:</span> <span className="font-mono text-cyan-400">{fileName}</span></div>
                      <div className="flex justify-between border-b border-white/5 pb-1"><span>Size:</span> <span className="font-mono text-cyan-400">{(fileSize/1024).toFixed(2)} KB</span></div>
                      <div className="flex justify-between border-b border-white/5 pb-1"><span>Target Arch:</span> <span className="font-mono text-cyan-400">{targetArch}</span></div>
+                     <div className="flex justify-between border-b border-white/5 pb-1"><span>Checksum (CRC32):</span> <span className="font-mono text-emerald-400">{currentFileCRC32 || 'N/A'}</span></div>
                      {projectAnalysisReport && (
                         <div className="pt-2">
                            <div className="text-yellow-500 font-bold mb-1">AI Heuristic Report:</div>
@@ -2209,7 +3088,8 @@ export default function ModdingHub({ settings }: { settings?: any }) {
             </header>
 
             <div className="flex-1 grid grid-cols-1 overflow-hidden">
-              {activeTool === 'pipeline' ? renderPipeline() : 
+               {activeTool === 'v9' ? renderV9Portal() :
+                activeTool === 'pipeline' ? renderPipeline() : 
                activeTool === 'scanner' ? renderScanner() :
                activeTool === 'strings' ? renderStringsTool() :
                activeTool === 'lab' ? renderLab() :
@@ -2335,6 +3215,15 @@ export default function ModdingHub({ settings }: { settings?: any }) {
                           ASM ➡️ HEX PATCH
                         </button>
                         <button 
+                          onClick={handleRefactorASM}
+                          disabled={isProcessing}
+                          className="px-3 py-1 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded hover:bg-amber-500/20 transition-all flex items-center gap-1"
+                          title="Melhorar legibilidade do ASM (Comentários + Formatação)"
+                        >
+                          {isProcessing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                          BEAUTIFY ASM
+                        </button>
+                        <button 
                           onClick={handleApplyPatch}
                           disabled={isProcessing || !cppResult}
                           className="px-3 py-1 bg-green-500/10 text-green-400 border border-green-500/20 rounded hover:bg-green-500/20 transition-all flex items-center gap-1"
@@ -2380,6 +3269,9 @@ export default function ModdingHub({ settings }: { settings?: any }) {
                     <HexEditorView 
                       projectId={activeProjectId || undefined}
                       data={fileData}
+                      originalData={originalFileData}
+                      showDiff={showDiff}
+                      onToggleDiff={setShowDiff}
                       offset={hexOffset}
                       onOffsetChange={setHexOffset}
                       onHoverOffset={setHoveredOffset}

@@ -79,6 +79,37 @@ export async function deepAnalyzeWithAI(asm: string, arch: ArchType, settings?: 
 }
 
 /**
+ * Translates a set of strings using AI, considering platform and character limits.
+ */
+export async function translateStringsWithAI(strings: string[], platform: string, targetLanguage: string, settings?: any): Promise<any> {
+  return withRetry(async () => {
+    const response = await fetch('/api/translate-strings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ strings, platform, targetLanguage, settings })
+    });
+    if (!response.ok) throw new Error('Network error during string translation');
+    return await response.json();
+  }, "AI_STRING_TRANSLATION");
+}
+
+/**
+ * Performs a deep forensic scan of binary data.
+ */
+export async function deepScanWithAI(hexSample: string, platform: string, settings?: any): Promise<string> {
+  return withRetry(async () => {
+    const response = await fetch('/api/deep-scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hexSample, platform, settings })
+    });
+    if (!response.ok) throw new Error('Network error during deep scan');
+    const data = await response.json();
+    return data.analysis || "Nenhuma análise detalhada disponível.";
+  }, "AI_DEEP_SCAN");
+}
+
+/**
  * Specifically extracts function signatures from assembly.
  */
 export async function extractSignatureWithAI(asm: string, arch: ArchType, settings?: any): Promise<string> {
@@ -120,7 +151,13 @@ export async function decompileWithAI(asm: string, context: DecompContext, setti
     const response = await fetch('/api/decompile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ asm, intent: context.intent, arch: context.arch, settings })
+      body: JSON.stringify({ 
+        asm, 
+        intent: context.intent, 
+        arch: context.arch, 
+        hint: ARCH_HINTS[context.arch],
+        settings 
+      })
     });
     if (!response.ok) throw new Error('Network error during decompilation');
     const data = await response.json();
@@ -220,6 +257,22 @@ export async function compileASMWithAI(asm: string, targetArch: ArchType, settin
     if (hex === "ERROR") throw new Error("AI indicated syntax error in ASM.");
     return hex;
   }, "AI_COMPILATION");
+}
+
+/**
+ * Refactors ASM code by adding comments and standardizing formatting via AI.
+ */
+export async function refactorASMWithAI(asm: string, arch: ArchType, settings?: any): Promise<string> {
+  return withRetry(async () => {
+    const response = await fetch('/api/refactor-asm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ asm, arch, settings })
+    });
+    if (!response.ok) throw new Error('Network error during ASM refactoring');
+    const data = await response.json();
+    return data.refactored || asm;
+  }, "AI_ASM_REFACTOR");
 }
 
 /**
@@ -324,5 +377,22 @@ export async function symbolicExecutionAssistant(code: string, state: any, platf
       return "**Erro no Assistente Simbólico.**";
     }
   }, "AI_SYMBOLIC_EXECUTION");
+}
+
+/**
+ * Injects industrial-grade knowledge into the current environment.
+ */
+export async function injectKnowledgeV9(topic: string, context: any, settings?: any): Promise<string> {
+  return withRetry(async () => {
+    logger.info(`[V9] Injecting knowledge for ${topic}...`);
+    const response = await fetch('/api/knowledge-injection', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic, context, settings })
+    });
+    if (!response.ok) throw new Error('Network error during knowledge injection');
+    const data = await response.json();
+    return data.documentation || "// Injection failed.";
+  }, "AI_KNOWLEDGE_INJECTION");
 }
 

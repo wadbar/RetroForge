@@ -1,4 +1,4 @@
-import React, { useState, useMemo, Suspense } from 'react';
+import React, { useState, useMemo, Suspense, useEffect } from 'react';
 import { 
   Terminal, 
   Cpu, 
@@ -17,7 +17,8 @@ import {
   Image as ImageIcon, 
   Box, 
   Music as MusicIcon,
-  Loader2
+  Loader2,
+  Activity
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -81,7 +82,10 @@ export default function App() {
     customAiPrompt: ''
   });
 
-  React.useEffect(() => {
+  const [sysStats, setSysStats] = useState({ totalMem: 'N/A', usedMem: 'N/A', cpuLoad: 'N/A' });
+  const [aiStatus, setAiStatus] = useState({ local: 'Online', cloud: 'Connected' });
+
+  useEffect(() => {
     const saved = localStorage.getItem('RF_SETTINGS');
     if (saved) {
       try {
@@ -90,6 +94,25 @@ export default function App() {
         console.error("Failed to load settings", e);
       }
     }
+
+    const fetchStats = async () => {
+      try {
+        const res = await fetch('/api/system/stats');
+        if (res.ok) {
+           const data = await res.json();
+           setSysStats({
+             totalMem: data.totalMemoryStr,
+             usedMem: data.usedMemoryStr,
+             cpuLoad: data.cpuLoadPercent || 'N/A'
+           });
+        }
+      } catch (e) {
+        console.error("Failed to fetch stats", e);
+      }
+    };
+    fetchStats();
+    const interval = setInterval(fetchStats, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   const sidebarTransition = {
@@ -189,15 +212,20 @@ export default function App() {
           <div className="flex items-center gap-4 text-xs font-mono text-gray-500">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-green-500" />
-              SYSTEM_READY
+              CPU: <span className="text-white">{sysStats.cpuLoad}%</span>
             </div>
             <div className="h-4 w-[1px] bg-white/10" />
-            <div className="flex items-center gap-2 text-purple-400">
-              <Terminal className="w-3 h-3" /> Local AI: Online (LM Studio)
+            <div className="flex items-center gap-2">
+              <Activity className="w-3 h-3" />
+              MEM: <span className="text-white">{sysStats.usedMem}</span> / {sysStats.totalMem}
             </div>
             <div className="h-4 w-[1px] bg-white/10" />
-            <div className="flex items-center gap-2 text-cyan-400">
-              <BrainCircuit className="w-3 h-3" /> Cloud AI: Connected
+            <div className={`flex items-center gap-2 ${aiStatus.local === 'Online' ? 'text-purple-400' : 'text-gray-600'}`}>
+              <Terminal className="w-3 h-3" /> Local AI: {aiStatus.local}
+            </div>
+            <div className="h-4 w-[1px] bg-white/10" />
+            <div className={`flex items-center gap-2 ${aiStatus.cloud === 'Connected' ? 'text-cyan-400' : 'text-gray-600'}`}>
+              <BrainCircuit className="w-3 h-3" /> Cloud AI: {aiStatus.cloud}
             </div>
             <div className="h-4 w-[1px] bg-white/10" />
             <select 
@@ -205,9 +233,8 @@ export default function App() {
               value={settings.turboMode ? "turbo" : "offline"}
               onChange={(e) => setSettings({...settings, turboMode: e.target.value === 'turbo'})}
             >
-              <option value="turbo">Modo Turbo (Cloud + LM Studio)</option>
-              <option value="offline">Modo Desconectado (Só Local)</option>
-              <option value="search">Modo Pesquisa (Cloud c/ Web)</option>
+              <option value="turbo">Modo Turbo</option>
+              <option value="offline">Modo Desconectado</option>
             </select>
           </div>
         </header>

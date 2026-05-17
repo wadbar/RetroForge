@@ -93,14 +93,25 @@ async function startServer() {
   
   app.get("/api/system/stats", async (req, res) => {
     const os = await import('os');
-    const totalMemStr = (os.totalmem() / (1024 ** 3)).toFixed(1) + ' GB';
-    const usedMemStr = ((os.totalmem() - os.freemem()) / (1024 ** 3)).toFixed(1) + ' GB';
+    const totalMemStr = (os.totalmem() / (1024 ** 3)).toFixed(2) + ' GB';
+    const usedMemStr = ((os.totalmem() - os.freemem()) / (1024 ** 3)).toFixed(2) + ' GB';
     const cpuLoadPercent = Math.min(100, (os.loadavg()[0] / os.cpus().length) * 100).toFixed(1);
-    res.json({ totalMemoryStr: totalMemStr, usedMemoryStr: usedMemStr, cpuLoadPercent });
+    res.json({ 
+      totalMemoryStr: totalMemStr, 
+      usedMemoryStr: usedMemStr, 
+      cpuLoadPercent,
+      load: os.loadavg()
+    });
   });
 
   app.get("/api/system/telemetry", (req, res) => {
-    res.json({ status: "active", engine: "ResilientAiCore", providers: ["Ollama", "Gemini", "NVIDIA"] });
+    res.json({ 
+      status: "hyper-active", 
+      engine: "ResilientAiCore V9", 
+      providers: ["Ollama", "Gemini", "NVIDIA"],
+      uptime: process.uptime(),
+      memory: process.memoryUsage()
+    });
   });
 
   app.get("/api/system/circuit-breaker", (req, res) => {
@@ -229,8 +240,32 @@ async function startServer() {
     const { code, platform } = req.body;
     try {
       const result = await ResilientAiCore.generate({
-        prompt: `Callstack analysis para ${platform}. Código:\n${code}\nRetorne JSON de grafo no final.`,
-        systemInstruction: "Arquiteto especialista em grafo de chamadas e análise de binários.",
+        prompt: `Realize uma análise profunda da hierarquia de chamadas (Call Stack) para a plataforma ${platform}.
+Código Alvo (ASM/C++):
+${code}
+
+Tarefas:
+1. Identifique todos os fluxos de chamadas e dependências funcionais.
+2. Identifique explicitamente POTENCIAIS PONTOS DE ENTRADA (Entry Points) e GANCHOS (Hooks) para modificação (ROM Hacking).
+3. Analise se há recursividade ou loops complexos.
+4. Gere um grafo de chamadas no formato JSON ao final da resposta.
+
+O JSON deve seguir este formato:
+\`\`\`json
+{
+  "nodes": [
+    { "id": "func1", "name": "main", "type": "entry" },
+    { "id": "func2", "name": "sub_logic", "type": "function" },
+    { "id": "hook1", "name": "hook_vblank", "type": "entry" }
+  ],
+  "links": [
+    { "source": "func1", "target": "func2", "label": "invokes" }
+  ]
+}
+\`\`\`
+
+A explicação em texto deve detalhar por que certas funções são bons alvos para 'hooks'.`,
+        systemInstruction: "Você é um Arquiteto de Sistemas de Elite, especialista em Grafos de Controle de Fluxo (CFG), Engenharia Reversa e Identificação de Vetores de Injeção em Binários Retro.",
         responseType: 'text',
         settings: req.body.settings
       });
@@ -335,16 +370,116 @@ ${asm}`,
     }
   });
 
-  app.post("/api/decompile", async (req, res) => {
-    const { asm, arch, intent } = req.body;
+  app.post("/api/translate-strings", async (req, res) => {
+    const { strings, platform, targetLanguage, settings } = req.body;
     try {
       const result = await ResilientAiCore.generate({
-        prompt: `Decompile ${arch} ASM to C++ (Intent: ${intent}):\n${asm}`,
-        systemInstruction: "Decompilador Neural Sênior.",
+        prompt: `Traduza as seguintes strings de um binário de ${platform} para ${targetLanguage}.
+Mantenha a semântica de tradução de jogos retro.
+MUITO IMPORTANTE: Para cada string, forneça uma tradução que respeite o limite de caracteres (tamanho original ou menor, se possível).
+Se a tradução for maior, indique "[LONG]" no início.
+Retorne um objeto JSON com o seguinte formato:
+{
+  "translations": [
+    { "original": "...", "translated": "...", "length_ok": true, "suggested_pointer_update": false }
+  ]
+}
+
+Strings:
+${JSON.stringify(strings)}`,
+        systemInstruction: "Expert em Localização de Jogos Retro e Romhacking.",
+        responseType: 'json',
+        settings: req.body.settings
+      });
+      res.json(result.content);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/system/arch-fingerprint", async (req, res) => {
+    const { hexSample } = req.body;
+    try {
+      const result = await ResilientAiCore.generate({
+        prompt: `Analise as seguintes sequências hexadecimais: ${hexSample}. 
+Determine a arquitetura provável (MIPS R3000, x86, ARM, Z80, 6502, etc.) baseada em padrões de opcodes, alinhamento de 4-bytes, endianness e prólogos de função comuns. 
+Retorne um JSON: { "arch": "...", "confidence": 0.0, "reasoning": "..." }`,
+        systemInstruction: "Expert System Architect & Forensic Analyst. Identifique arquiteturas binárias com precisão cirúrgica.",
+        responseType: 'json',
+        settings: req.body.settings
+      });
+      res.json(result.content);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/decompile", async (req, res) => {
+    const { asm, arch, intent, hint, pass = "full" } = req.body;
+    
+    // Guard: Prevent massive payloads
+    if (asm && asm.length > 100000) {
+      return res.status(413).json({ error: "Payload too large. Max 100KB ASM." });
+    }
+
+    const decompileInstructions = {
+      full: "Translate into clean, high-level C++ pseudo-code with detailed structural comments.",
+      logic_only: "Extract ONLY the logical control flow (loops, branches, conditions) in an abstract representation.",
+      naming: "Focus strictly on identifying and generating meaningful names for variables and functions based on their access patterns."
+    };
+    const instructions = decompileInstructions[pass as keyof typeof decompileInstructions] || decompileInstructions.full;
+
+    const cacheKey = `decompile_${crypto.createHash('md5').update(asm + arch + pass).digest('hex')}`;
+    const cached = getCached(cacheKey);
+    if (cached) return res.json({ analysis: cached, source: 'cache' });
+
+    try {
+      const result = await ResilientAiCore.generate({
+        prompt: `${instructions}
+Target Arch: ${arch}
+${hint ? `Architectural Context: ${hint}` : ""}
+
+Focus points:
+1. Control flow fidelity.
+2. Structure/Object inference.
+3. Call stack reconstruction.
+4. Memory safety annotations.
+
+Context/Mod Intent: ${intent || "General Forensic Analysis"}
+
+Assembly Code:
+${asm}`,
+        systemInstruction: "Expert Neural Decompiler & Reverse Engineering Architect specializing in legacy game console architectures and binary security.",
         responseType: 'text',
         settings: req.body.settings
       });
-      res.json({ analysis: result.content });
+      setCache(cacheKey, result.content);
+      res.json({ analysis: result.content, source: 'model' });
+    } catch (e: any) {
+      console.error(`[AI DECOMPILE ERROR]`, e);
+      res.status(500).json({ error: "Decompilation engine failure. Check architecture constraints." });
+    }
+  });
+
+  app.post("/api/refactor-asm", async (req, res) => {
+    const { asm, arch } = req.body;
+    try {
+      const result = await ResilientAiCore.generate({
+        prompt: `Refatore este código Assembly ${arch} para legibilidade industrial.
+Diretrizes:
+1. Comentários detalhados linha a linha explicando o propósito lógico.
+2. Identifique o uso de registradores (ex: indicar que $a0 é usado como contador ou ponteiro).
+3. Padronize a indentação.
+4. Tente inferir nomes de labels baseados no comportamento (ex: loop_copy, handle_input).
+5. Se detectar padrões de BIOS ou syscalls MIPS (R3000), documente-os.
+
+Código:
+${asm}`,
+        systemInstruction: "Especialista Supremo em Engenharia Reversa MIPS R3000 e Analista de Binários.",
+        responseType: 'text',
+        settings: req.body.settings
+      });
+      res.json({ refactored: result.content });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
@@ -375,6 +510,45 @@ ${asm}`,
         settings: req.body.settings
       });
       res.json({ analysis: result.content });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/deep-scan", async (req, res) => {
+    const { hexSample, platform } = req.body;
+    try {
+      const result = await ResilientAiCore.generate({
+        prompt: `Realize um escaneamento forense profundo neste trecho hexadecimal de ${platform}.
+Identifique:
+1. Padrões de alinhamento de dados.
+2. Possíveis tabelas de ponteiros (pelo menos 3 candidatos).
+3. Assinaturas de compilador (MSVC, GCC, Watcom, etc).
+4. Entropia visual aproximada.
+
+Hex: ${hexSample}`,
+        systemInstruction: "Especialista sênior em forense digital e análise de artefatos binários.",
+        responseType: 'text',
+        settings: req.body.settings
+      });
+      res.json({ analysis: result.content });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/advanced-decipher", async (req, res) => {
+    const { hexSample, context } = req.body;
+    try {
+      const result = await ResilientAiCore.generate({
+        prompt: `Analise as seguintes sequências hexadecimais: ${hexSample}. 
+Contexto do Sistema: ${context}
+Determine se há estruturas de compressão proprietárias, cabeçalhos de arquivos embutidos ou lógica de bytecode customizada.`,
+        systemInstruction: "Expert em Engenharia Reversa e Forense de Dados. Retorne análise estrutural profunda.",
+        responseType: 'json',
+        settings: req.body.settings
+      });
+      res.json(result.content);
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
@@ -421,10 +595,12 @@ Exiba os resultados no formato Markdown estruturado:
 
   app.get("/api/system/health", (req, res) => {
     res.json({
-      status: "GREEN",
+      status: "OPTIMAL",
       uptime: process.uptime(),
-      eventsPerSecond: Math.random() * 5,
+      eventsPerSecond: (Math.random() * 5).toFixed(2),
       memory: process.memoryUsage().heapUsed,
+      nodeVersion: process.version,
+      platform: process.platform,
       activeModules: ["Vite", "SocketIO", "ResilientAiCore", "YARA_Scanner"]
     });
   });
@@ -494,6 +670,31 @@ Exiba os resultados no formato Markdown estruturado:
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
+
+  // --- V9 SUPREME COGNITIVE OPERATING SYSTEM ENDPOINTS ---
+
+  app.post("/api/knowledge-injection", async (req, res) => {
+    const { topic, context } = req.body;
+    try {
+      const result = await ResilientAiCore.generate({
+        prompt: `INJEÇÃO DE CONHECIMENTO SUPREMO V9.
+Assunto: ${topic}
+Contexto do Projeto: ${JSON.stringify(context)}
+
+Tarefa:
+1. Realize uma busca profunda (mentalmente ou via ferramentas externas se disponíveis) sobre as APIS/Bibliotecas mencionadas.
+2. Identifique lacunas de segurança ou performance na implementação atual.
+3. Forneça o "Latest Ecosystem Pattern" para resolver.
+4. Retorne em formato Markdown industrial.`,
+        systemInstruction: "Você é o Engenheiro de Software Supremo V9. Forneça documentação técnica de nível industrial e correções cirúrgicas.",
+        responseType: 'text',
+        settings: req.body.settings
+      });
+      res.json({ documentation: result.content });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
 
   server.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
