@@ -1,0 +1,8 @@
+{
+  "name": "RetroForge Engine",
+  "description": "Unified research platform for legacy architectures and binary deconstruction. Features AI-powered decompilation, symbolic execution, and automated HLE mapping for retro systems (PS1, N64, M68K).",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
