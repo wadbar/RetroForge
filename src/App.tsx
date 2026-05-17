@@ -149,7 +149,7 @@ export default function App() {
           </AnimatePresence>
         </div>
 
-        <nav className="flex-1 mt-4 px-3 space-y-1 overflow-y-auto no-scrollbar">
+        <nav className="flex-1 mt-4 px-3 space-y-1 overflow-y-auto no-scrollbar" aria-label="Navegação Principal">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentView === item.id;
@@ -157,6 +157,8 @@ export default function App() {
               <button
                 key={item.id}
                 onClick={() => setCurrentView(item.id as View)}
+                aria-label={item.label}
+                aria-current={isActive ? 'page' : undefined}
                 className={`w-full flex items-center gap-4 p-3 rounded-lg transition-all group relative ${
                   isActive 
                     ? 'bg-cyan-500/10 text-cyan-400' 
@@ -194,6 +196,8 @@ export default function App() {
           </div>
           <button 
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            aria-label={isSidebarOpen ? "Recolher Painel" : "Expandir Painel"}
+            aria-expanded={isSidebarOpen}
             className="w-full flex items-center gap-3 p-2 hover:bg-white/5 rounded-lg text-gray-500 transition-colors"
           >
             <ChevronRight className={`w-5 h-5 transition-transform duration-500 ${isSidebarOpen ? 'rotate-180' : ''}`} />
@@ -209,7 +213,7 @@ export default function App() {
         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-purple-500/5 blur-[120px] pointer-events-none -z-10" />
 
         <header className="h-16 border-b border-white/5 flex items-center justify-between px-8 bg-[#0A0A0A]/80 backdrop-blur-md z-10">
-          <div className="flex items-center gap-4 text-xs font-mono text-gray-500">
+          <div className="flex items-center gap-4 text-xs font-mono text-gray-500" aria-live="polite" aria-atomic="true">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-green-500" />
               CPU: <span className="text-white">{sysStats.cpuLoad}%</span>
@@ -232,6 +236,7 @@ export default function App() {
               className="bg-black border border-white/10 text-gray-300 px-3 py-1 rounded outline-none hover:border-gray-500 transition-colors cursor-pointer"
               value={settings.turboMode ? "turbo" : "offline"}
               onChange={(e) => setSettings({...settings, turboMode: e.target.value === 'turbo'})}
+              aria-label="Selecionar modo de operação da IA"
             >
               <option value="turbo">Modo Turbo</option>
               <option value="offline">Modo Desconectado</option>

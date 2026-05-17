@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { CFGEngine, CFG } from '../../core/CFGEngine';
+import { CFGEngine, CFG } from '../core/CFGEngine';
 import { CFGVisualizer } from './CFGVisualizer';
 import { Activity, Brain, AlertTriangle } from 'lucide-react';
 

@@ -100,13 +100,20 @@ export default function AIAssistant({ activeProjectId, settings }: { activeProje
     <div className="flex flex-col h-[calc(100vh-160px)] max-w-5xl mx-auto bg-[#0F0F0F] border border-white/5 rounded-xl shadow-2xl overflow-hidden relative">
       <div className="p-4 border-b border-white/5 bg-white/5 flex items-center justify-between sticky top-0 z-10 backdrop-blur-sm">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-cyan-500 rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(6,182,212,0.5)]">
+          <div className="w-10 h-10 bg-cyan-500 rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(6,182,212,0.5)] relative">
             <Bot className="text-black w-6 h-6" />
+            <motion.div 
+               className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-[#0F0F0F] ${isLoading ? 'bg-orange-500' : 'bg-green-500'}`}
+               initial={{ scale: 0.8 }}
+               animate={{ scale: [0.8, 1.2, 0.8] }}
+               transition={{ repeat: Infinity, duration: 2 }}
+            />
           </div>
           <div>
             <h2 className="text-white font-bold leading-none">RetroForge AI</h2>
             <span className="text-[10px] text-cyan-400 font-mono uppercase tracking-widest flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" /> Expert Systems Eng
+              <span className={`w-1.5 h-1.5 rounded-full ${isLoading ? 'bg-orange-500 animate-pulse' : 'bg-green-500'}`} /> 
+              {isLoading ? 'Analisando Fluxo...' : 'Conectado'}
             </span>
           </div>
         </div>
@@ -151,18 +158,18 @@ export default function AIAssistant({ activeProjectId, settings }: { activeProje
           ))}
         </AnimatePresence>
         {isLoading && (
-          <div className="flex justify-start">
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
             <div className="flex gap-4">
-              <div className="w-8 h-8 rounded-full bg-cyan-500 flex items-center justify-center animate-pulse">
+              <div className="w-8 h-8 rounded-full bg-cyan-500 flex items-center justify-center animate-spin">
                 <Sparkles className="w-4 h-4 text-black" />
               </div>
               <div className="p-4 bg-white/5 border border-white/10 rounded-2xl flex gap-1 items-center h-[52px]">
-                <span className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
-                <span className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
-                <span className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-bounce" />
+                <motion.span animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1 }} className="w-2 h-2 bg-cyan-500 rounded-full" />
+                <motion.span animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-2 h-2 bg-cyan-500 rounded-full" />
+                <motion.span animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-2 h-2 bg-cyan-500 rounded-full" />
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
         <div ref={messagesEndRef} />
       </div>

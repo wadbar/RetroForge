@@ -198,10 +198,11 @@ export default function ProjectDashboard({ activeProjectId, onSelectProject, onS
   const projectGrid = useMemo(() => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {projects.map((project, idx) => (
-        <motion.div 
+        <button 
           key={project.id}
           onClick={() => onSelectProject(project.id)}
-          className={`bg-[#141414] border rounded-2xl p-6 group transition-all relative cursor-pointer ${
+          aria-label={`Selecionar projeto ${project.name}`}
+          className={`bg-[#141414] border rounded-2xl p-6 group transition-all relative text-left w-full ${
             activeProjectId === project.id ? 'border-cyan-500 shadow-[0_0_20px_rgba(6,182,212,0.1)]' : 'border-white/5'
           }`}
         >
@@ -237,7 +238,7 @@ export default function ProjectDashboard({ activeProjectId, onSelectProject, onS
               </div>
             </div>
           </div>
-        </motion.div>
+        </button>
       ))}
     </div>
   ), [projects, activeProjectId, onSelectProject]);
@@ -262,6 +263,7 @@ export default function ProjectDashboard({ activeProjectId, onSelectProject, onS
         {toastMsg && (
           <motion.div initial={{ opacity: 0, y: 50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.9, y: 50 }}
             className={`fixed bottom-6 right-6 p-4 rounded-xl shadow-2xl flex items-center gap-3 z-50 ${toastMsg.type === 'error' ? 'bg-red-500/20 text-red-100 border border-red-500/50' : 'bg-cyan-500/20 text-cyan-100 border border-cyan-500/50'}`}
+            role="alert"
           >
             {toastMsg.type === 'error' ? <X className="w-5 h-5 text-red-500" /> : <Activity className="w-5 h-5 text-cyan-400" />}
             <p className="text-sm font-medium">{toastMsg.text}</p>
