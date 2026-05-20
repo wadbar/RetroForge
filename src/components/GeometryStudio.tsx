@@ -125,13 +125,6 @@ export default function GeometryStudio() {
             vertices.push([x, y, z]);
             currentOffset += stride;
         }
-    } else {
-        // Render a placeholder cube if no file is loaded, simulating memory layout
-        const s = 1;
-        vertices.push(
-            [-s,-s,-s], [s,-s,-s], [s,s,-s], [-s,s,-s],
-            [-s,-s,s], [s,-s,s], [s,s,s], [-s,s,s]
-        );
     }
 
     // Connect vertices (wireframe)
@@ -164,7 +157,7 @@ export default function GeometryStudio() {
 
     ctx.beginPath();
     // Render lines (assuming raw triangles: every 3 vertices form a tri)
-    if (fileData) {
+    if (fileData && vertices.length > 0) {
         for (let i = 0; i < vertices.length - 2; i += 3) {
             const p1 = project(vertices[i][0], vertices[i][1], vertices[i][2]);
             const p2 = project(vertices[i+1][0], vertices[i+1][1], vertices[i+1][2]);
@@ -175,19 +168,6 @@ export default function GeometryStudio() {
             ctx.lineTo(p3.x, p3.y);
             ctx.lineTo(p1.x, p1.y);
         }
-    } else {
-        // Draw standard cube
-        const edges = [
-            [0,1], [1,2], [2,3], [3,0],
-            [4,5], [5,6], [6,7], [7,4],
-            [0,4], [1,5], [2,6], [3,7]
-        ];
-        edges.forEach(edge => {
-            const p1 = project(vertices[edge[0]][0]*2, vertices[edge[0]][1]*2, vertices[edge[0]][2]*2);
-            const p2 = project(vertices[edge[1]][0]*2, vertices[edge[1]][1]*2, vertices[edge[1]][2]*2);
-            ctx.moveTo(p1.x, p1.y);
-            ctx.lineTo(p2.x, p2.y);
-        });
     }
     
     ctx.stroke();

@@ -275,12 +275,27 @@ A explicação em texto deve detalhar por que certas funções são bons alvos p
     }
   });
 
+  app.post("/api/hook-point", async (req, res) => {
+    const { asmContext, platform } = req.body;
+    try {
+      const result = await ResilientAiCore.generate({
+        prompt: `Com base no código Assembly fornecido e na arquitetura do sistema (${platform}), use a IA para sugerir pontos de hook potenciais e explique quais registradores são críticos para a lógica de 'dano zero'. Forneça o código ASM de um hook simples que redirecione a execução para uma rotina de 'dano zero'.\n\nContexto:\n${asmContext}`,
+        systemInstruction: "You are a Senior Reverse Engineer. Create highly precise ASM hooks for the requested architecture.",
+        responseType: 'text',
+        settings: req.body.settings
+      });
+      res.json({ analysis: result.content });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   app.post("/api/hle-suggest", async (req, res) => {
     const { hex, platform } = req.body;
     try {
       const result = await ResilientAiCore.generate({
-        prompt: `Identifique chamadas de SDK/Syscalls para ${platform} no hex:\n${hex}`,
-        systemInstruction: "Expert em HLE/SDK legados.",
+        prompt: `Scan the following binary context (hex/asm) for known High-Level Emulation (HLE) signatures and common SDK/BIOS calls relevant to the target architecture (${platform}). Suggest equivalent C/C++ function names or standard library calls based on the detected patterns:\n\n${hex}`,
+        systemInstruction: "You are an expert Systems and Emulation Architecture Engineer. Your role is mapping raw architecture binaries to High-Level Emulation (HLE) C/C++ functions. Respond with clear, structured markdown describing the detected syscalls, and map them to their standard C/C++ equivalent functions.",
         responseType: 'text',
         settings: req.body.settings
       });
@@ -376,7 +391,7 @@ ${asm}`,
       const result = await ResilientAiCore.generate({
         prompt: `Traduza as seguintes strings de um binário de ${platform} para ${targetLanguage}.
 Mantenha a semântica de tradução de jogos retro.
-MUITO IMPORTANTE: Para cada string, forneça uma tradução que respeite o limite de caracteres (tamanho original ou menor, se possível).
+MUITO IMPORTANTE: Para cada string, forneça uma tradução que respeite o limite de caracteres (tamanho original ou menor, se possível), utilizando abreviações de palavras para caber na limitação de espaço do cartucho.
 Se a tradução for maior, indique "[LONG]" no início.
 Retorne um objeto JSON com o seguinte formato:
 {
@@ -392,6 +407,28 @@ ${JSON.stringify(strings)}`,
         settings: req.body.settings
       });
       res.json(result.content);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/analyze-tbl", async (req, res) => {
+    const { sampleHex, strings } = req.body;
+    try {
+      const result = await ResilientAiCore.generate({
+        prompt: `ANALISTA DE BINÁRIO RETRO.
+        HEX: ${sampleHex}
+        STRINGS EXTRAÍDAS (ASCII): ${strings.slice(0, 20).join(' | ')}
+        
+        Tarefa: Identifique a codificação de texto (TBL) relacionando o Hex e os caracteres.
+        O TBL deve mapear o byte em hexadecimal (e.g. "41", "4B") para o caractere correspondente.
+        Retorne RESULTADOS no formato exato JSON:
+        {"table": {"41": "A", "42": "B"}}`,
+        systemInstruction: "You are an expert reverse engineer. Always return valid JSON containing a 'table' mapping hex keys to characters.",
+        responseType: 'json',
+        settings: req.body.settings
+      });
+      res.json({ analysis: result.content });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }

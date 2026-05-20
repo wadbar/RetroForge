@@ -21,6 +21,7 @@ import {
   Activity
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { HealthDashboard } from './components/ui/HealthDashboard';
 
@@ -33,8 +34,6 @@ const AIFineTuning = React.lazy(() => import('./components/AIFineTuning'));
 const GraphicsStudio = React.lazy(() => import('./components/GraphicsStudio'));
 const GeometryStudio = React.lazy(() => import('./components/GeometryStudio'));
 const AudioStudio = React.lazy(() => import('./components/AudioStudio'));
-
-type View = 'dashboard' | 'community' | 'ai' | 'training' | 'translation' | 'modding' | 'graphics' | 'geometry' | 'audio' | 'settings';
 
 import { Container, SERVICES } from './core/di/Container';
 import { logger } from './services/loggerService';
@@ -56,22 +55,25 @@ Container.register(SERVICES.CONFIG, configService);
 Container.register('projectService', projectService);
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<View>('dashboard');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const currentView = location.pathname === '/' ? 'dashboard' : location.pathname.substring(1);
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const shouldReduceMotion = useReducedMotion();
 
   const navItems = useMemo(() => [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'community', label: 'Comunidade (GitHub)', icon: Github },
-    { id: 'ai', label: 'IA Assistente', icon: MessageSquare },
-    { id: 'training', label: 'Treinar IA', icon: BrainCircuit },
-    { id: 'translation', label: 'Tradução', icon: Languages },
-    { id: 'modding', label: 'Modding & Hacks', icon: Wrench },
-    { id: 'graphics', label: 'Gráficos (VRAM)', icon: ImageIcon },
-    { id: 'geometry', label: 'Geometria 3D', icon: Box },
-    { id: 'audio', label: 'Áudio & SFX', icon: MusicIcon },
-    { id: 'settings', label: 'Configurações', icon: Settings },
+    { id: 'dashboard', path: '/', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'community', path: '/community', label: 'Comunidade (GitHub)', icon: Github },
+    { id: 'ai', path: '/ai', label: 'IA Assistente', icon: MessageSquare },
+    { id: 'training', path: '/training', label: 'Treinar IA', icon: BrainCircuit },
+    { id: 'translation', path: '/translation', label: 'Tradução', icon: Languages },
+    { id: 'modding', path: '/modding', label: 'Modding & Hacks', icon: Wrench },
+    { id: 'graphics', path: '/graphics', label: 'Gráficos (VRAM)', icon: ImageIcon },
+    { id: 'geometry', path: '/geometry', label: 'Geometria 3D', icon: Box },
+    { id: 'audio', path: '/audio', label: 'Áudio & SFX', icon: MusicIcon },
+    { id: 'settings', path: '/settings', label: 'Configurações', icon: Settings },
   ], []);
 
   const [settings, setSettings] = useState({
@@ -95,24 +97,37 @@ export default function App() {
       }
     }
 
+    let isMounted = true;
+    const controller = new AbortController();
+
     const fetchStats = async () => {
+      if (!isMounted) return;
       try {
-        const res = await fetch('/api/system/stats');
+        const res = await fetch('/api/system/stats', { signal: controller.signal });
         if (res.ok) {
            const data = await res.json();
-           setSysStats({
-             totalMem: data.totalMemoryStr,
-             usedMem: data.usedMemoryStr,
-             cpuLoad: data.cpuLoadPercent || 'N/A'
-           });
+           if (isMounted) {
+             setSysStats({
+               totalMem: data.totalMemoryStr || 'N/A',
+               usedMem: data.usedMemoryStr || 'N/A',
+               cpuLoad: data.cpuLoadPercent !== undefined ? String(data.cpuLoadPercent) : 'N/A'
+             });
+           }
         }
-      } catch (e) {
-        console.error("Failed to fetch stats", e);
+      } catch (e: any) {
+        if (e.name === 'AbortError') return;
+        if (isMounted) {
+          console.error("[TELEMETRIA] Failed to fetch stats", e?.message || e);
+        }
       }
     };
     fetchStats();
     const interval = setInterval(fetchStats, 3000);
-    return () => clearInterval(interval);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      controller.abort();
+    };
   }, []);
 
   const sidebarTransition = {
@@ -156,7 +171,7 @@ export default function App() {
             return (
               <button
                 key={item.id}
-                onClick={() => setCurrentView(item.id as View)}
+                onClick={() => navigate(item.path)}
                 aria-label={item.label}
                 aria-current={isActive ? 'page' : undefined}
                 className={`w-full flex items-center gap-4 p-3 rounded-lg transition-all group relative ${
@@ -215,8 +230,8 @@ export default function App() {
         <header className="h-16 border-b border-white/5 flex items-center justify-between px-8 bg-[#0A0A0A]/80 backdrop-blur-md z-10">
           <div className="flex items-center gap-4 text-xs font-mono text-gray-500" aria-live="polite" aria-atomic="true">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-500" />
-              CPU: <span className="text-white">{sysStats.cpuLoad}%</span>
+               <div className="w-2 h-2 rounded-full bg-green-500" />
+               CPU: <span className="text-white">{sysStats.cpuLoad}%</span>
             </div>
             <div className="h-4 w-[1px] bg-white/10" />
             <div className="flex items-center gap-2">
@@ -261,115 +276,117 @@ export default function App() {
                     <span className="font-mono text-sm tracking-widest uppercase">Carregando Módulo...</span>
                   </div>
                 }>
-                  {currentView === 'dashboard' && <ProjectDashboard activeProjectId={activeProjectId} onSelectProject={setActiveProjectId} onStartModding={() => setCurrentView('modding')} settings={settings} />}
-                  {currentView === 'community' && <CommunityHub />}
-                  {currentView === 'ai' && <AIAssistant activeProjectId={activeProjectId} settings={settings} />}
-                  {currentView === 'training' && <AIFineTuning />}
-                  {currentView === 'translation' && <TranslationStudio />}
-                  {currentView === 'modding' && <ModdingHub settings={settings} />}
-                  {currentView === 'graphics' && <GraphicsStudio />}
-                  {currentView === 'geometry' && <GeometryStudio />}
-                  {currentView === 'audio' && <AudioStudio />}
+                  <Routes>
+                    <Route path="/" element={<ProjectDashboard activeProjectId={activeProjectId} onSelectProject={setActiveProjectId} onStartModding={() => navigate('/modding')} settings={settings} />} />
+                    <Route path="/community" element={<CommunityHub />} />
+                    <Route path="/ai" element={<AIAssistant activeProjectId={activeProjectId} settings={settings} />} />
+                    <Route path="/training" element={<AIFineTuning />} />
+                    <Route path="/translation" element={<TranslationStudio />} />
+                    <Route path="/modding" element={<ModdingHub settings={settings} />} />
+                    <Route path="/graphics" element={<GraphicsStudio />} />
+                    <Route path="/geometry" element={<GeometryStudio />} />
+                    <Route path="/audio" element={<AudioStudio />} />
+                    <Route path="/settings" element={
+                      <div className="max-w-2xl mx-auto space-y-8">
+                        <div className="space-y-2">
+                          <h1 className="text-3xl font-bold text-white">Configurações</h1>
+                          <p className="text-gray-500">Ajuste as ferramentas de recompilação e IA.</p>
+                        </div>
+                        
+                        <div className="bg-[#141414] border border-white/5 rounded-xl p-6 space-y-6">
+                          <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10">
+                            <div>
+                              <h3 className="text-white font-medium flex items-center gap-2">
+                                <BrainCircuit className="w-4 h-4 text-cyan-400" />
+                                Modelo de Nuvem Padrão
+                              </h3>
+                              <p className="text-sm text-gray-500 mt-1">gemini-3.1-pro-preview (Conectado)</p>
+                            </div>
+                            <ShieldCheck className="w-6 h-6 text-green-400" />
+                          </div>
+                          
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Caminho do SDK de Recompilação (Global)</label>
+                              <input 
+                                type="text" 
+                                value={settings.sdkPath}
+                                onChange={(e) => setSettings({...settings, sdkPath: e.target.value})}
+                                className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-sm font-mono text-cyan-400 outline-none focus:border-cyan-500 transition-colors"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Servidor de IA Local (LM Studio / Ollama)</label>
+                              <input 
+                                type="text" 
+                                value={settings.lmStudioUrl}
+                                onChange={(e) => setSettings({...settings, lmStudioUrl: e.target.value})}
+                                className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-sm font-mono text-cyan-400 outline-none focus:border-cyan-500 transition-colors"
+                                placeholder="http://localhost:1234/v1"
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Prompt de Sistema Personalizado (IA Assistant)</label>
+                              <textarea 
+                                rows={3}
+                                value={settings.customAiPrompt}
+                                onChange={(e) => setSettings({...settings, customAiPrompt: e.target.value})}
+                                className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-sm font-sans text-gray-300 outline-none focus:border-purple-500 transition-colors resize-none"
+                                placeholder="Ex: Responda sempre em tom brutalista e foque em otimização de ciclos de processador..."
+                              />
+                            </div>
+                            
+                            <div className="flex items-center justify-between p-4 bg-black/40 rounded-lg border border-white/5">
+                              <div>
+                                <p className="text-sm font-bold text-gray-300">Modo Turbo Automatizado</p>
+                                <p className="text-xs text-gray-500 mt-1">Delega tarefas simples para IA Local e pesadas para Nuvem</p>
+                              </div>
+                              <button 
+                                onClick={() => setSettings({...settings, turboMode: !settings.turboMode})}
+                                className={`w-12 h-6 rounded-full transition-colors relative ${settings.turboMode ? 'bg-cyan-500' : 'bg-gray-700'}`}
+                              >
+                                <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${settings.turboMode ? 'translate-x-6' : 'translate-x-0'}`} />
+                              </button>
+                            </div>
+
+                            <div className="flex items-center justify-between p-4 bg-black/40 rounded-lg border border-white/5">
+                              <div>
+                                <p className="text-sm font-bold text-gray-300">Auto-save do Blueprint</p>
+                                <p className="text-xs text-gray-500 mt-1">Salva as extrações nos projetos a cada 5 segundos</p>
+                              </div>
+                              <button 
+                                onClick={() => setSettings({...settings, autoSave: !settings.autoSave})}
+                                className={`w-12 h-6 rounded-full transition-colors relative ${settings.autoSave ? 'bg-cyan-500' : 'bg-gray-700'}`}
+                              >
+                                <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${settings.autoSave ? 'translate-x-6' : 'translate-x-0'}`} />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-4 pt-4 border-t border-white/10">
+                            <button 
+                              onClick={() => {
+                                localStorage.setItem('RF_SETTINGS', JSON.stringify(settings));
+                                logger.info("Configurações salvas no perfil global.");
+                              }}
+                              className="flex-1 py-3 bg-white text-black font-bold rounded-lg hover:bg-gray-200 transition-colors"
+                            >
+                              SALVAR ALTERAÇÕES
+                            </button>
+                            <button 
+                              onClick={() => setSettings({ lmStudioUrl: 'http://localhost:1234/v1', turboMode: true, autoSave: true, sdkPath: '/opt/retroforge-sdk', customAiPrompt: '' })}
+                              className="px-6 py-3 border border-white/10 rounded-lg hover:bg-white/5 transition-colors text-white font-bold"
+                            >
+                              RESET
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    } />
+                  </Routes>
                 </Suspense>
                 </ErrorBoundary>
-                {currentView === 'settings' && (
-                <div className="max-w-2xl mx-auto space-y-8">
-                  <div className="space-y-2">
-                    <h1 className="text-3xl font-bold text-white">Configurações</h1>
-                    <p className="text-gray-500">Ajuste as ferramentas de recompilação e IA.</p>
-                  </div>
-                  
-                  <div className="bg-[#141414] border border-white/5 rounded-xl p-6 space-y-6">
-                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10">
-                      <div>
-                        <h3 className="text-white font-medium flex items-center gap-2">
-                          <BrainCircuit className="w-4 h-4 text-cyan-400" />
-                          Modelo de Nuvem Padrão
-                        </h3>
-                        <p className="text-sm text-gray-500 mt-1">gemini-3.1-pro-preview (Conectado)</p>
-                      </div>
-                      <ShieldCheck className="w-6 h-6 text-green-400" />
-                    </div>
-                    
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Caminho do SDK de Recompilação (Global)</label>
-                        <input 
-                          type="text" 
-                          value={settings.sdkPath}
-                          onChange={(e) => setSettings({...settings, sdkPath: e.target.value})}
-                          className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-sm font-mono text-cyan-400 outline-none focus:border-cyan-500 transition-colors"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Servidor de IA Local (LM Studio / Ollama)</label>
-                        <input 
-                          type="text" 
-                          value={settings.lmStudioUrl}
-                          onChange={(e) => setSettings({...settings, lmStudioUrl: e.target.value})}
-                          className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-sm font-mono text-cyan-400 outline-none focus:border-cyan-500 transition-colors"
-                          placeholder="http://localhost:1234/v1"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Prompt de Sistema Personalizado (IA Assistant)</label>
-                        <textarea 
-                          rows={3}
-                          value={settings.customAiPrompt}
-                          onChange={(e) => setSettings({...settings, customAiPrompt: e.target.value})}
-                          className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-sm font-sans text-gray-300 outline-none focus:border-purple-500 transition-colors resize-none"
-                          placeholder="Ex: Responda sempre em tom brutalista e foque em otimização de ciclos de processador..."
-                        />
-                      </div>
-                      
-                      <div className="flex items-center justify-between p-4 bg-black/40 rounded-lg border border-white/5">
-                        <div>
-                          <p className="text-sm font-bold text-gray-300">Modo Turbo Automatizado</p>
-                          <p className="text-xs text-gray-500 mt-1">Delega tarefas simples para IA Local e pesadas para Nuvem</p>
-                        </div>
-                        <button 
-                          onClick={() => setSettings({...settings, turboMode: !settings.turboMode})}
-                          className={`w-12 h-6 rounded-full transition-colors relative ${settings.turboMode ? 'bg-cyan-500' : 'bg-gray-700'}`}
-                        >
-                          <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${settings.turboMode ? 'translate-x-6' : 'translate-x-0'}`} />
-                        </button>
-                      </div>
-
-                      <div className="flex items-center justify-between p-4 bg-black/40 rounded-lg border border-white/5">
-                        <div>
-                          <p className="text-sm font-bold text-gray-300">Auto-save do Blueprint</p>
-                          <p className="text-xs text-gray-500 mt-1">Salva as extrações nos projetos a cada 5 segundos</p>
-                        </div>
-                        <button 
-                          onClick={() => setSettings({...settings, autoSave: !settings.autoSave})}
-                          className={`w-12 h-6 rounded-full transition-colors relative ${settings.autoSave ? 'bg-cyan-500' : 'bg-gray-700'}`}
-                        >
-                          <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${settings.autoSave ? 'translate-x-6' : 'translate-x-0'}`} />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-4 pt-4 border-t border-white/10">
-                      <button 
-                        onClick={() => {
-                          localStorage.setItem('RF_SETTINGS', JSON.stringify(settings));
-                          logger.info("Configurações salvas no perfil global.");
-                        }}
-                        className="flex-1 py-3 bg-white text-black font-bold rounded-lg hover:bg-gray-200 transition-colors"
-                      >
-                        SALVAR ALTERAÇÕES
-                      </button>
-                      <button 
-                        onClick={() => setSettings({ lmStudioUrl: 'http://localhost:1234/v1', turboMode: true, autoSave: true, sdkPath: '/opt/retroforge-sdk', customAiPrompt: '' })}
-                        className="px-6 py-3 border border-white/10 rounded-lg hover:bg-white/5 transition-colors text-white font-bold"
-                      >
-                        RESET
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
             </motion.div>
           </AnimatePresence>
         </div>

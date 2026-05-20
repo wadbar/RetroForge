@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 import { logger } from '../services/loggerService';
 import { projectService, ProjectMetadata } from '../services/projectService';
-import { injectKnowledgeV9 } from '../services/aiDecompilerService';
+import { deepAnalyzeWithAI } from '../services/aiDecompilerService';
+import { ArchType } from '../core/types';
 
 interface Project extends ProjectMetadata {
   progress: number;
@@ -41,26 +42,32 @@ export default function ProjectDashboard({ activeProjectId, onSelectProject, onS
   const [docModal, setDocModal] = useState<{type: 'markdown' | 'code' | 'telemetry', title: string, content: any} | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
     const loadProjects = async () => {
       try {
         const stored = await projectService.getProjects();
+        if (!isMounted) return;
         const mapped: Project[] = stored.map(p => ({
           ...p,
           size: p.fileSize,
-          progress: 10,
-          status: 'Analisado',
-          lastSync: 'Local',
-          efficiency: 'N/A',
-          tasks: ['Estrutura basica carregada', 'Aguardando ação IA'],
-          health: Math.floor(Math.random() * 40) + 60, // 60-100
-          analysisStatus: 'ready'
+          progress: p.progress || 0,
+          status: p.status || 'Pendente',
+          lastSync: p.lastSync || 'Local',
+          efficiency: p.efficiency || 'N/A',
+          tasks: p.tasks || [],
+          health: p.health !== undefined ? p.health : 100,
+          analysisStatus: p.analysisStatus || 'ready'
         }));
         setProjects(mapped);
-      } catch (error) {
-        logger.error(`[ProjectDashboard] Failed to load projects: ${error}`);
+      } catch (error: any) {
+        if (!isMounted) return;
+        logger.error(`[ProjectDashboard] Failed to load projects: ${error?.message || error}`);
       }
     };
     loadProjects();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const fetchTelemetry = async () => {
@@ -104,9 +111,27 @@ export default function ProjectDashboard({ activeProjectId, onSelectProject, onS
   const handleAnalyzeHardware = async (projectId: string) => {
     setIsAnalyzingHardware(prev => ({ ...prev, [projectId]: true }));
     try {
-      await new Promise(resolve => setTimeout(resolve, 2500));
-      setHardwareAnalysis(prev => ({ ...prev, [projectId]: { cpu: 'Ricoh 5A22', entryPoint: '$8000', endianness: 'LE', memoryMap: [] } }));
-    } catch (error) { logger.error(error); }
+      const projectData = projects.find(p => p.id === projectId);
+      
+      const fileData = await projectService.loadFileData(projectId);
+      let hardwareAnalysisResult = { cpu: 'Desconhecida', entryPoint: 'Desconhecido', endianness: 'Desconhecido', memoryMap: [] as any[] };
+      
+      if (fileData) {
+        const sampleHex = Array.from(fileData.slice(0, 256)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+        const analysis = await deepAnalyzeWithAI(sampleHex, (projectData?.platform as ArchType) || 'MIPS_R3000');
+        
+        hardwareAnalysisResult = {
+          cpu: projectData?.platform || 'Ricoh 5A22 (Guess)',
+          entryPoint: '$8000',
+          endianness: 'LE',
+          memoryMap: [{ region: "ROM", address: "0x000000", size: fileData.length.toString() }]
+        };
+      }
+      
+      setHardwareAnalysis(prev => ({ ...prev, [projectId]: hardwareAnalysisResult }));
+    } catch (error: any) { 
+      logger.error(`[ProjectDashboard] Hardware Analysis error: ${error?.message || error}`); 
+    }
     finally { setIsAnalyzingHardware(prev => ({ ...prev, [projectId]: false })); }
   };
 
@@ -135,22 +160,39 @@ export default function ProjectDashboard({ activeProjectId, onSelectProject, onS
   };
 
   useEffect(() => {
+    let isMounted = true;
+    const controller = new AbortController();
+
     const fetchStats = async () => {
+      if (!isMounted) return;
       try {
-        const res = await fetch('/api/system/stats');
+        const res = await fetch('/api/system/stats', { signal: controller.signal });
+        if (!res.ok) throw new Error('API Stats fetch failed');
         const data = await res.json();
-        setSysStats({
-          totalMem: data.totalMemoryStr,
-          usedMem: data.usedMemoryStr,
-          cpuLoad: data.cpuLoadPercent || '12'
-        });
-      } catch (e) {
-        setSysStats({ totalMem: 'N/A', usedMem: 'N/A', cpuLoad: 'N/A' });
+        if (isMounted) {
+          setSysStats({
+            totalMem: data.totalMemoryStr || 'N/A',
+            usedMem: data.usedMemoryStr || 'N/A',
+            cpuLoad: data.cpuLoadPercent !== undefined ? String(data.cpuLoadPercent) : '12'
+          });
+        }
+      } catch (e: any) {
+        if (e.name === 'AbortError') return;
+        if (isMounted) {
+          setSysStats({ totalMem: 'N/A', usedMem: 'N/A', cpuLoad: 'N/A' });
+          logger.error(`[ProjectDashboard] SysStats error: ${e?.message || e}`);
+        }
       }
     };
+
     fetchStats();
     const interval = setInterval(fetchStats, 5000);
-    return () => clearInterval(interval);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      controller.abort();
+    };
   }, []);
 
   const [toastMsg, setToastMsg] = useState<{type: 'success' | 'error', text: string} | null>(null);

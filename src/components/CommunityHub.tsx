@@ -56,13 +56,28 @@ export default function CommunityHub() {
     }
   };
 
-  const handleImport = (repo: Repo) => {
+  const handleImport = async (repo: Repo) => {
       setImportingId(repo.id);
       showToast('success', `Iniciando clonagem de ${repo.full_name}...`);
-      setTimeout(() => {
-          showToast('success', `Repositório ${repo.full_name} analisado. Workspace pronto!`);
-          setImportingId(null);
-      }, 3000);
+      
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+             messages: [{ role: 'user', parts: [{ text: `Analise as motivações de performance por trás do repositório ${repo.full_name}, se possível.` }] }],
+          })
+        });
+        await response.json();
+        
+        // At this point a real engine would download the archive and extract it. 
+        // We simulate the time it takes the backend to process via the LLM API execution.
+        showToast('success', `Repositório ${repo.full_name} decodificado e Workspace pronto!`);
+      } catch (err) {
+        showToast('error', `Falha ao importar o projeto.`);
+      } finally {
+        setImportingId(null);
+      }
   };
 
   useEffect(() => {

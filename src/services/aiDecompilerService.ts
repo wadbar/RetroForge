@@ -205,21 +205,21 @@ export async function generatePatchWithAI(asm: string, context: PatchContext, se
 /**
  * Analyzes binary patterns to detect TBL or custom encodings.
  */
-export async function analyzeEncodingWithAI(sampleHex: string, strings: string[], settings?: any): Promise<string> {
-  const customPrompt = settings?.customAiPrompt ? `\n\nINSTRUÇÕES ADICIONAIS DO USUÁRIO:\n${settings.customAiPrompt}` : "";
+export async function analyzeEncodingWithAI(sampleHex: string, strings: string[], settings?: any): Promise<any> {
   return withRetry(async () => {
-    const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
-      contents: `
-        ANALISTA DE BINÁRIO RETRO.
-        HEX: ${sampleHex}
-        STRINGS EXTRAÍDAS: ${strings.slice(0, 20).join(' | ')}
-        ${customPrompt}
-        
-        Tarefa: Identifique a codificação de texto e sugira um mapeamento TBL.
-      `,
+    logger.info(`[AI] Analyzing TBL Encoding...`);
+    const response = await fetch('/api/analyze-tbl', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sampleHex, strings, settings })
     });
-    return response.text || "// No analysis.";
+    if (!response.ok) throw new Error('Network error during TBL analysis');
+    const data = await response.json();
+    let tblJson = data.analysis;
+    if (typeof tblJson === 'string') {
+       try { tblJson = JSON.parse(tblJson); } catch (e) {}
+    }
+    return tblJson || { table: {} };
   }, "AI_ENCODING_ANALYSIS");
 }
 
@@ -315,6 +315,26 @@ export async function suggestHLEWithAI(hex: string, platform: string, settings?:
       return "**Erro na tradução HLE.**";
     }
   }, "AI_HLE_SUGGEST");
+}
+
+/**
+ * Suggests a hook point and zero-damage hook logic for a given ASM context.
+ */
+export async function suggestHookPointWithAI(asmContext: string, platform: string, settings?: any): Promise<string> {
+  return withRetry(async () => {
+    logger.info(`[AI] Fetching Hook Point suggestions for ${platform}...`);
+    try {
+      const response = await fetch('/api/hook-point', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ asmContext, platform, settings })
+      });
+      const data = await response.json();
+      return data.analysis || "// No hook suggestions found.";
+    } catch (e) {
+      return "**Erro ao gerar hook point.**";
+    }
+  }, "AI_HOOK_SUGGEST");
 }
 
 /**

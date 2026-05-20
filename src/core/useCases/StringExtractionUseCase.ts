@@ -13,14 +13,51 @@ export class StringExtractionUseCase {
   /**
    * Extracts strings from a Uint8Array buffer.
    * @param data The binary data to analyze.
+   * @param tblMap Optional custom character table mapping (e.g., { 0x41: 'A' })
    * @returns Array of TranslatedString objects.
    */
-  public static execute(data: Uint8Array): TranslatedString[] {
+  public static execute(data: Uint8Array, tblMap?: Record<number, string>): TranslatedString[] {
     const extracted: TranslatedString[] = [];
-    const decoder = new TextDecoder('utf-8', { fatal: false });
     
-    logger.info(`Starting string extraction on buffer of size ${data.length} bytes`);
+    logger.info(`Starting string extraction on buffer of size ${data.length} bytes${tblMap ? ' with custom TBL' : ''}`);
 
+    if (tblMap && Object.keys(tblMap).length > 0) {
+      // Byte-level extraction using TBL
+      let currentString = '';
+      let startOffset = -1;
+      
+      for (let offset = 0; offset < data.length; offset++) {
+        if (extracted.length >= this.MAX_STRINGS) break;
+
+        const byte = data[offset];
+        const char = tblMap[byte];
+
+        if (char !== undefined) {
+          if (startOffset === -1) startOffset = offset;
+          currentString += char;
+        } else {
+          // Break condition
+          if (currentString.length >= 4 && this.isValidString(currentString)) {
+             const id = `0x${startOffset.toString(16).toUpperCase().padStart(6, '0')}`;
+             if (!extracted.some(s => s.id === id)) {
+                extracted.push({
+                   id,
+                   original: currentString,
+                   translation: '',
+                   status: 'pending',
+                   key: `STR_${startOffset.toString(16).toUpperCase()}`
+                });
+             }
+          }
+          currentString = '';
+          startOffset = -1;
+        }
+      }
+      return extracted;
+    }
+
+    // Default ASCII extraction extraction
+    const decoder = new TextDecoder('utf-8', { fatal: false });
     for (let offset = 0; offset < data.length && extracted.length < this.MAX_STRINGS; offset += this.CHUNK_SIZE) {
       const chunk = data.subarray(offset, Math.min(offset + this.CHUNK_SIZE + 100, data.length));
       const text = decoder.decode(chunk);
@@ -32,11 +69,9 @@ export class StringExtractionUseCase {
         const foundText = match[0];
         const matchOffset = offset + match.index;
 
-        // Domain Filters
         if (this.isValidString(foundText)) {
           const id = `0x${matchOffset.toString(16).toUpperCase().padStart(6, '0')}`;
           
-          // Deduplication for overlapping chunks
           if (extracted.some(s => s.id === id)) continue;
 
           extracted.push({

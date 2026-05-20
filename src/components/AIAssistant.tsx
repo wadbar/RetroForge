@@ -35,20 +35,37 @@ export default function AIAssistant({ activeProjectId, settings }: { activeProje
   }, [messages]);
 
   useEffect(() => {
-    // Load memory from localStorage
-    const savedMemory = localStorage.getItem(`retroforge_memory_${activeProjectId}`);
-    if (savedMemory) setAssistantMemory(JSON.parse(savedMemory));
+    let isMounted = true;
+    try {
+      const savedMemory = localStorage.getItem(`retroforge_memory_${activeProjectId}`);
+      if (savedMemory && isMounted) setAssistantMemory(JSON.parse(savedMemory));
+    } catch (e) {
+      console.error("[TELEMETRIA] Erro ao parsear memória local:", e);
+    }
     
-    setMessages([
-      { role: 'assistant', content: 'Olá! Sou o RetroForge AI. Percebi que você está trabalhando em um projeto. Como posso ajudar na portabilidade ou tradução técnica hoje?' }
-    ]);
+    if (isMounted) {
+      setMessages([
+        { role: 'assistant', content: 'Olá! Sou o RetroForge AI. Percebi que você está trabalhando em um projeto. Como posso ajudar na portabilidade ou tradução técnica hoje?' }
+      ]);
+    }
+    return () => { isMounted = false; }
   }, [activeProjectId]);
+
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (activeProjectId) {
       localStorage.setItem(`retroforge_memory_${activeProjectId}`, JSON.stringify(assistantMemory));
     }
   }, [assistantMemory, activeProjectId]);
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -58,6 +75,11 @@ export default function AIAssistant({ activeProjectId, settings }: { activeProje
     const newMessages = [...messages, { role: 'user' as const, content: userMessage }];
     setMessages(newMessages);
     setIsLoading(true);
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
 
     try {
       const ragContext = localStorage.getItem('retroforge_rag_context') || "";
@@ -74,7 +96,8 @@ export default function AIAssistant({ activeProjectId, settings }: { activeProje
           })),
           systemInstruction: dynamicSystemPrompt,
           settings: settings
-        })
+        }),
+        signal: abortControllerRef.current.signal
       });
       
       const data = await response.json();
@@ -82,8 +105,9 @@ export default function AIAssistant({ activeProjectId, settings }: { activeProje
       if (data.error) throw new Error(data.error);
 
       setMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
-    } catch (error) {
-      console.error(error);
+    } catch (error: any) {
+      if (error.name === 'AbortError') return;
+      console.error("[TELEMETRIA] Chat fetch error:", error?.message || error);
       setMessages(prev => [...prev, { role: 'assistant', content: 'Erro ao conectar com a IA. Verifique sua conexão e tente novamente.' }]);
     } finally {
       setIsLoading(false);

@@ -35,7 +35,9 @@ export default function TranslationStudio() {
   const [commonSequences, setCommonSequences] = useState<{sequence: string, count: number}[]>([]);
   const [targetLanguage, setTargetLanguage] = useState('Português (Brasil)');
   const [repointingEnabled, setRepointingEnabled] = useState(true);
-  
+  const [tblMap, setTblMap] = useState<Record<number, string> | null>(null);
+  const [tblContentText, setTblContentText] = useState("");
+
   // Agent State
   const [agentStatus, setAgentStatus] = useState<'idle' | 'extracting' | 'analyzing' | 'translating' | 'patching' | 'done'>('idle');
   const [agentLogs, setAgentLogs] = useState<string[]>([]);
@@ -148,15 +150,29 @@ export default function TranslationStudio() {
 
     addAgentLog("Tradução finalizada.");
     
-    // Step 4: Patch Generation (with Repointing simulation)
+    // Step 4: Patch Generation and Validation
     setAgentStatus('patching');
-    addAgentLog(`Passo 4: Construindo IPS Patch com Auto-Repointing (${repointingEnabled ? 'Ativo' : 'Inativo'})...`);
+    addAgentLog(`Passo 4: Validação OOB e Geração de IPS Patch...`);
     
     if (repointingEnabled) {
-       addAgentLog("[REPOINTING AGENT] Calculando novo tamanho em bytes das strings Traduzidas...");
-       addAgentLog("[REPOINTING AGENT] OOB Detectado (Out-of-Bounds). Buscando Code Caves via Radare2...");
-       addAgentLog("[REPOINTING AGENT] Espaço livre encontrado em 0x00FF0000. Movendo blocos de texto...");
-       addAgentLog("[REPOINTING AGENT] Atualizando Pointer Table original (TBL)...");
+       addAgentLog("[REPOINTING AGENT] Calculando novo tamanho em bytes das strings Traduzidas vs Originais...");
+       let outOfBoundsCount = 0;
+       
+       currentTranslations.forEach(s => {
+         if (s.translation && s.status !== 'pending') {
+           const originalSize = new TextEncoder().encode(s.original).length;
+           const newSize = new TextEncoder().encode(s.translation).length;
+           if (newSize > originalSize) {
+             outOfBoundsCount++;
+           }
+         }
+       });
+       
+       if (outOfBoundsCount > 0) {
+           addAgentLog(`[ALERTA] ${outOfBoundsCount} strings ultrapassam o tamanho original. Sem Code Caves/TBL repointing real, o jogo pode crashar. Exportando IPS mesmo assim.`);
+       } else {
+           addAgentLog("[REPOINTING AGENT] Todos os tamanhos estão dentro dos limites originais.");
+       }
     }
 
     exportPatch(currentTranslations, file.name, file.size);
@@ -165,9 +181,9 @@ export default function TranslationStudio() {
     setAgentStatus('done');
   };
 
-  const extractStringsLogic = (data: Uint8Array) => {
+  const extractStringsLogic = (data: Uint8Array, customTbl?: Record<number, string>) => {
     try {
-      return StringExtractionUseCase.execute(data);
+      return StringExtractionUseCase.execute(data, customTbl || tblMap || undefined);
     } catch (error) {
       logger.error('Failed to execute StringExtractionUseCase', error);
       showToast('error', 'Falha na extração de strings.');
@@ -218,8 +234,25 @@ export default function TranslationStudio() {
         const offset = parseInt(str.id, 16);
         if (offset > 0xFFFFFF) continue;
 
-        const encoder = new TextEncoder();
-        let newBytes = encoder.encode(str.translation); 
+        let newBytes: number[] = [];
+        if (tblMap) {
+           const reverseTblMap = new Map<string, number>();
+           for (const [k, v] of Object.entries(tblMap)) {
+               reverseTblMap.set(v, Number(k));
+           }
+           for (let i = 0; i < str.translation.length; i++) {
+               const char = str.translation[i];
+               const byte = reverseTblMap.get(char);
+               if (byte !== undefined) {
+                   newBytes.push(byte);
+               } else {
+                   newBytes.push(char.charCodeAt(0) & 0xFF);
+               }
+           }
+        } else {
+           const encoder = new TextEncoder();
+           newBytes = Array.from(encoder.encode(str.translation)); 
+        }
 
         ipsBytes.push((offset >> 16) & 0xFF);
         ipsBytes.push((offset >> 8) & 0xFF);
@@ -378,15 +411,47 @@ export default function TranslationStudio() {
       addAgentLog("[AI ANALYZER] Roteando para Motor de Análise de Codificação...");
       const result = await analyzeEncodingWithAI(sampleHex, strings.map(s => s.original));
       
+      let tblPreview = "Nenhuma tabela detectada pela IA.";
+      let parsedTbl: Record<number, string> | null = null;
+      if (result && result.table) {
+        parsedTbl = {};
+        let textFormat = "";
+        for (const [hexStr, charVal] of Object.entries(result.table)) {
+           const byteVal = parseInt(hexStr, 16);
+           if (!isNaN(byteVal)) {
+              parsedTbl[byteVal] = String(charVal);
+              textFormat += `${hexStr.toUpperCase()}=${charVal}\n`;
+           }
+        }
+        tblPreview = textFormat;
+      }
+      
       openModal("Análise da IA (Encoding & TBL Mapping)", (
         <div className="space-y-4">
           <div className="bg-black/60 border border-white/10 rounded-lg p-4 font-mono text-xs text-gray-400 overflow-x-auto">
              <span className="text-cyan-400 block mb-2 font-bold uppercase">Amostra Hex Sugerida:</span>
              {sampleHex.slice(0, 128)}...
           </div>
-          <div className="whitespace-pre-wrap text-sm text-gray-300 max-h-96 overflow-y-auto custom-scrollbar pr-2 leading-relaxed">
-            {result}
+          <div className="bg-black/60 border border-white/10 rounded-lg p-4">
+            <span className="text-cyan-400 block mb-2 font-bold uppercase text-xs">Mapeamento TBL Inferido (JSON via IA):</span>
+            <div className="whitespace-pre-wrap text-sm text-gray-300 max-h-48 overflow-y-auto custom-scrollbar font-mono">
+               {tblPreview}
+            </div>
           </div>
+          {parsedTbl && (
+            <button 
+              onClick={() => {
+                 setTblMap(parsedTbl);
+                 setTblContentText(tblPreview);
+                 if (fileData) setStrings(extractStringsLogic(fileData, parsedTbl));
+                 setModalOpen(false);
+                 showToast('success', 'Tabela de Caracteres aplicada! Strings recarregadas.');
+              }}
+              className="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-black font-bold text-xs rounded-xl transition-all uppercase"
+            >
+              Aplicar TBL e Reextrair Strings
+            </button>
+          )}
         </div>
       ), true);
       
@@ -545,25 +610,27 @@ export default function TranslationStudio() {
           </button>
           <button 
             onClick={() => {
-                let tblContent = "";
-                // Gerar TBL ASCII simples
-                for(let i = 32; i <= 126; i++) {
-                    tblContent += `${i.toString(16).toUpperCase().padStart(2, '0')}=${String.fromCharCode(i)}\n`;
+                let tblContent = tblContentText;
+                if (!tblContent) {
+                  // Gerar TBL ASCII simples
+                  for(let i = 32; i <= 126; i++) {
+                      tblContent += `${i.toString(16).toUpperCase().padStart(2, '0')}=${String.fromCharCode(i)}\n`;
+                  }
                 }
                 const blob = new Blob([tblContent], { type: 'text/plain' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `Ascii_AutoGenerated.tbl`;
+                a.download = `Caracteres_${tblMap ? 'Modificado' : 'Default'}.tbl`;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
             }}
-            className="flex items-center gap-2 px-4 py-3 bg-white/5 border border-white/10 text-gray-300 font-bold rounded-xl hover:bg-white/10 transition-all"
+            className="flex items-center gap-2 px-4 py-3 bg-white/5 border border-white/10 text-gray-300 font-bold rounded-xl hover:bg-white/10 transition-all text-xs lg:text-sm"
           >
             <Download className="w-4 h-4" />
-            BAIXAR .TBL (ASCII)
+            {tblMap ? 'BAIXAR .TBL (CUSTOM)' : 'BAIXAR .TBL (ASCII)'}
           </button>
           {strings.length > 0 && (
             <button 

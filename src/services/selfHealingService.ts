@@ -40,10 +40,10 @@ export class SelfHealingService {
 
     // Step 1: Nuclear Cache Purge
     localStorage.removeItem('AI_CACHE'); 
+    localStorage.removeItem('PROJECTS');
+    localStorage.removeItem('SETTINGS');
     
-    // Step 2: Service Reset Simulation
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
+    // Step 2: Metrics Reset
     monitor.resetMetrics();
     logger.info("[SELF-HEALING] System metrics reset. Caches cleared. Monitoring continued.");
     

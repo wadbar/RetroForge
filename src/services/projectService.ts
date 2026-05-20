@@ -11,6 +11,13 @@ export interface ProjectMetadata {
   platform: string;
   fileSize: number;
   version: number;
+  progress?: number;
+  status?: string;
+  lastSync?: string;
+  efficiency?: string;
+  tasks?: string[];
+  health?: number;
+  analysisStatus?: 'pending' | 'scanning' | 'ready' | 'error';
 }
 
 /**

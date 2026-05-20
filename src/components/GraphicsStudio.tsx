@@ -148,14 +148,26 @@ export default function GraphicsStudio() {
      setModalConfig({
        title: "Recolorir com IA",
        inputPlaceholder: "ex: 'estilo gameboy original', 'tons de azul neon'",
-       onSubmit: (val) => {
+       onSubmit: async (val) => {
          if (!val) return;
          setModalConfig({ title: "Processando", message: `IA gerando paleta baseada em: ${val}`});
-         setModalOpen(true);
-         setTimeout(() => {
-            setPaletteHex("0F380F,8BAC0F,306230,9BBC0F"); // GB palette
-            setModalOpen(false);
-         }, 1000);
+         
+         try {
+           const response = await fetch('/api/chat', {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({
+               messages: [{ role: 'user', parts: [{ text: `Gere UMA paleta HEX para 4 cores para este tema: ${val}. Responda APENAS as 4 cores separadas por virgula (ex: 0F380F,8BAC0F,306230,9BBC0F).` }] }],
+             })
+           });
+           const data = await response.json();
+           const newPalette = data.response?.trim() || "0F380F,8BAC0F,306230,9BBC0F";
+           setPaletteHex(newPalette);
+         } catch(e) {
+           console.error("AI Palette error", e);
+         } finally {
+           setModalOpen(false);
+         }
        }
      });
      setModalOpen(true);
@@ -228,15 +240,29 @@ export default function GraphicsStudio() {
            </button>
            <button 
              onClick={async () => {
-               setModalConfig({ title: "AI Rendering Hook", message: "Analisando rotinas de renderização associadas a este offset de VRAM..." });
+               setModalConfig({ title: "Processando...", message: "Analisando rotinas de renderização associadas a este offset de VRAM..." });
                setModalOpen(true);
-               // Mock delay for AI thinking
-               setTimeout(() => {
-                 setModalConfig({ 
-                   title: "Hook Sugestivo (Renderização)", 
-                   message: `Para interceptar a renderização do offset 0x${offset.toString(16).toUpperCase()}, sugere-se um hook no loop de Vblank ou na rotina de transferência de DMA.\n\nDeseja abrir o Assistente de Patch para gerar o código?` 
+               
+               let aiMessage = "Não foi possível gerar a sugestão. Verifique sua conexão.";
+               
+               try {
+                 const response = await fetch('/api/chat', {
+                   method: 'POST',
+                   headers: { 'Content-Type': 'application/json' },
+                   body: JSON.stringify({
+                     messages: [{ role: 'user', parts: [{ text: `Descreva resumidamente um hook de VRAM ideal em assembly MIPS para interceptar a renderização no offset 0x${offset.toString(16).toUpperCase()}` }] }],
+                   })
                  });
-               }, 1500);
+                 const data = await response.json();
+                 aiMessage = data.response?.trim() || aiMessage;
+               } catch(e) {
+                 console.error("AI Hook error", e);
+               } 
+               
+               setModalConfig({ 
+                 title: "Hook Sugestivo (Renderização)", 
+                 message: aiMessage 
+               });
              }}
              className="px-4 py-2 bg-purple-500/10 border border-purple-500/30 text-purple-400 font-bold rounded-xl flex items-center gap-2 hover:bg-purple-500 hover:text-white transition-all shadow-[0_0_15px_rgba(168,85,247,0.15)]"
            >

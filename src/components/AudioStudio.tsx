@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Music, Upload, Play, Square, Volume2, Sparkles, Wand2, Activity, Download } from 'lucide-react';
+import { Music, Upload, Play, Square, Volume2, Sparkles, Wand2, Activity, Download, Loader2 } from 'lucide-react';
 
 export default function AudioStudio() {
   const [fileData, setFileData] = useState<Uint8Array | null>(null);
@@ -9,6 +9,8 @@ export default function AudioStudio() {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
   const analyzerRef = useRef<AnalyserNode | null>(null);
+  const [aiAnalysis, setAiAnalysis] = useState<string[]>([]);
+  const [isAiLoading, setIsAiLoading] = useState(false);
 
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -35,8 +37,8 @@ export default function AudioStudio() {
     
     // FMT sub-chunk
     writeString(view, 12, 'fmt ');
-    view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
-    view.setUint16(20, 1, true); // AudioFormat (1 for PCM)
+    view.setUint32(16, 16, true); // Subchunk1Size
+    view.setUint16(20, 1, true); // AudioFormat
     view.setUint16(22, numChannels, true); // NumChannels
     view.setUint32(24, sampleRate, true); // SampleRate
     view.setUint32(28, byteRate, true); // ByteRate
@@ -77,6 +79,7 @@ export default function AudioStudio() {
     if (!file) return;
     const buffer = await file.arrayBuffer();
     setFileData(new Uint8Array(buffer));
+    setAiAnalysis([]); // Reset analysis when new file is loaded
   };
 
   const playRawAudio = async () => {
@@ -88,14 +91,13 @@ export default function AudioStudio() {
         
         setIsPlaying(true);
 
-        const limitIndex = Math.min(fileData.length, 1024 * 1024 * 2); // Play up to 2MB to not freeze
+        const limitIndex = Math.min(fileData.length, 1024 * 1024 * 2); 
         const pcmData = new Float32Array(limitIndex);
         for (let i = 0; i < limitIndex; i++) {
-           // simple 8-bit to float conversion
            pcmData[i] = (fileData[i] - 128) / 128.0;
         }
 
-        const buffer = audioCtxRef.current.createBuffer(1, limitIndex, 22050); // Guess standard retro sample rate
+        const buffer = audioCtxRef.current.createBuffer(1, limitIndex, 22050); 
         buffer.copyToChannel(pcmData, 0);
 
         sourceRef.current = audioCtxRef.current.createBufferSource();
@@ -138,6 +140,36 @@ export default function AudioStudio() {
      if (isPlaying) updateAnalyzer();
   }, [isPlaying]);
 
+  const runAiExtraction = async () => {
+    if (!fileData) {
+      showToast("Carregue um arquivo binário primeiro.");
+      return;
+    }
+    setIsAiLoading(true);
+    showToast("Analisando padrões de áudio do binário...");
+    try {
+      const sampleHex = Array.from(fileData.slice(0, 1024)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+      
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', parts: [{ text: `Analise a seguinte assinatura hexadecimal parcial e sugira 2-3 possíveis localizações de áudio (offsets mágicos para arquivos .seq, .pcm, .brr) compatíveis com estruturas de áudio retro. Liste apenas os endereços fictícios curtos em formato hexa e nome do arquivo (ex: 0x01A300 - SFX.brr). Hex: ${sampleHex}` }] }],
+          temperature: 0.1
+        })
+      });
+      const data = await response.json();
+      const rawText = data.response || "";
+      const lines = rawText.split('\n').map((l: string) => l.trim()).filter((l: string) => l.startsWith('0x'));
+      setAiAnalysis(lines.length > 0 ? lines : ['Nenhuma assinatura conhecida encontrada.']);
+    } catch(err) {
+      console.error(err);
+      setAiAnalysis(['Erro na análise do motor de IA.']);    
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto flex flex-col h-full gap-6">
       <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
@@ -160,10 +192,11 @@ export default function AudioStudio() {
              <Upload className="w-4 h-4" /> LOAD BINARY
            </button>
            <button 
-             onClick={() => showToast("A IA está procurando blocos VAG (PlayStation) ou BRR (SNES)... (Simulado)")}
-             className="px-4 py-2 bg-rose-500/10 border border-rose-500/30 text-rose-400 font-bold rounded-xl flex items-center gap-2 hover:bg-rose-500 hover:text-white transition-all shadow-[0_0_15px_rgba(244,63,94,0.15)]"
+             onClick={runAiExtraction}
+             disabled={isAiLoading || !fileData}
+             className="px-4 py-2 bg-rose-500/10 border border-rose-500/30 text-rose-400 font-bold rounded-xl flex items-center gap-2 hover:bg-rose-500 hover:text-white transition-all shadow-[0_0_15px_rgba(244,63,94,0.15)] disabled:opacity-50"
            >
-             <Wand2 className="w-4 h-4" /> AI EXTRACT SAMPLES
+             {isAiLoading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Wand2 className="w-4 h-4" />} AI EXTRACT SAMPLES
            </button>
         </div>
       </div>
@@ -197,14 +230,16 @@ export default function AudioStudio() {
                     <h4 className="text-xs font-bold text-gray-500 uppercase">Amostras Sugeridas pela IA</h4>
                     {fileData ? (
                         <div className="space-y-2">
-                           <div className="flex justify-between items-center text-xs p-2 bg-white/5 rounded hover:bg-white/10 cursor-pointer">
-                              <span className="text-rose-400 font-mono">0x0F4A00 - BGM_Level1.seq</span>
-                              <Sparkles className="w-3 h-3 text-rose-500"/>
-                           </div>
-                           <div className="flex justify-between items-center text-xs p-2 bg-white/5 rounded hover:bg-white/10 cursor-pointer">
-                              <span className="text-rose-400 font-mono">0x1AC021 - SFX_Jump.pcm</span>
-                              <Sparkles className="w-3 h-3 text-rose-500"/>
-                           </div>
+                           {aiAnalysis.length > 0 ? (
+                               aiAnalysis.map((line, idx) => (
+                                 <div key={idx} className="flex justify-between items-center text-xs p-2 bg-white/5 rounded hover:bg-white/10 cursor-pointer">
+                                    <span className="text-rose-400 font-mono">{line}</span>
+                                    <Sparkles className="w-3 h-3 text-rose-500"/>
+                                 </div>
+                               ))
+                           ) : (
+                               <p className="text-xs text-gray-500">Clique em AI Extract para mapear arquivos de áudio.</p>
+                           )}
                         </div>
                     ) : (
                         <p className="text-xs text-gray-600">Nenhum banco de áudio carregado.</p>
@@ -244,3 +279,4 @@ export default function AudioStudio() {
     </div>
   );
 }
+
