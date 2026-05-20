@@ -59,30 +59,32 @@ export class ResilientAiCore {
 
     console.log(`\n[AI-CORE-MONITOR] [${new Date().toISOString()}] Iniciando requisição de IA...`);
 
-    // Pipeline de Fallback Nível 1 -> Nível 2 -> Nível 3
-    
-    // --- NÍVEL 1: OLLAMA LOCAL ---
-    try {
-      const result = await this.tryOllama(prompt, systemInstruction, temperature, startTime);
-      return this.validateAndFormat(result, responseType);
-    } catch (error: any) {
-      this.logFailure('OLLAMA', error.message);
+    // Pipeline de Execução Inteligente (AI Studio vs Outros)
+    const isAiStudio = process.env.DISABLE_HMR === 'true'; // Flag nativa do AI Studio Dev Server
+    const providers: AIProvider[] = isAiStudio 
+      ? ['gemini'] 
+      : ['ollama', 'gemini', 'nvidia'];
+
+    if (isAiStudio) {
+      console.log(`[AI-CORE-NATIVE] Ambiente AI Studio detectado. Redirecionando poder computacional primário para Gemini Nativo...`);
+    } else {
+      console.log(`[AI-CORE-LOCAL] Ambiente externo detectado. Iniciando pipeline tático (Ollama -> Gemini -> Nvidia)...`);
     }
 
-    // --- NÍVEL 2: GOOGLE GEMINI ---
-    try {
-      const result = await this.tryGemini(prompt, systemInstruction, temperature, startTime);
-      return this.validateAndFormat(result, responseType);
-    } catch (error: any) {
-      this.logFailure('GEMINI', error.message);
-    }
-
-    // --- NÍVEL 3: NVIDIA NIM ---
-    try {
-      const result = await this.tryNvidia(prompt, systemInstruction, temperature, startTime);
-      return this.validateAndFormat(result, responseType);
-    } catch (error: any) {
-      this.logFailure('NVIDIA', error.message);
+    for (const provider of providers) {
+      try {
+        let result: Partial<AIResult>;
+        if (provider === 'gemini') {
+          result = await this.tryGemini(prompt, systemInstruction, temperature, startTime);
+        } else if (provider === 'ollama') {
+          result = await this.tryOllama(prompt, systemInstruction, temperature, startTime);
+        } else {
+          result = await this.tryNvidia(prompt, systemInstruction, temperature, startTime);
+        }
+        return this.validateAndFormat(result, responseType);
+      } catch (error: any) {
+        this.logFailure(provider.toUpperCase(), error.message);
+      }
     }
 
     // FAIAL TOTAL
@@ -146,13 +148,12 @@ export class ResilientAiCore {
 
     console.log(`[AI-CORE-LEVEL-2] Tentando Google Gemini com modelo ${modelName}...`);
 
-    const fullPrompt = `${system}\n\nREQUISIÇÃO:\n${prompt}`;
-
     const genAI = new GoogleGenAI({ apiKey: apiKey });
     const result = await genAI.models.generateContent({
       model: modelName,
-      contents: fullPrompt,
+      contents: prompt,
       config: {
+        systemInstruction: system,
         temperature: temp
       }
     });
