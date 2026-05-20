@@ -2510,7 +2510,7 @@ int process_status_logic(EntityHealth* entity_ptr) {
 
   return (
     <div 
-      className={`flex h-screen bg-[#050505] text-gray-400 font-mono text-xs overflow-hidden selection:bg-cyan-500/30 transition-all ${isDragging ? 'ring-4 ring-cyan-500 ring-inset' : ''}`}
+      className={`flex h-screen bg-background text-on-background font-sans text-body-medium overflow-hidden selection:bg-primary-container selection:text-on-primary-container transition-all ${isDragging ? 'ring-4 ring-primary ring-inset' : ''}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -2542,11 +2542,11 @@ int process_status_logic(EntityHealth* entity_ptr) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-[999] bg-cyan-900/40 backdrop-blur-sm border-4 border-dashed border-cyan-400 flex flex-col items-center justify-center p-12 pointer-events-none"
+            className="absolute inset-0 z-[999] bg-primary-container/80 backdrop-blur-sm border-4 border-dashed border-primary flex flex-col items-center justify-center p-12 pointer-events-none"
           >
-             <Upload className="w-24 h-24 text-cyan-400 animate-bounce mb-6" />
-             <h2 className="text-4xl text-white font-extrabold tracking-widest uppercase">Drop Binary File</h2>
-             <p className="text-cyan-200 mt-2 text-lg">ROMs, ELF, EXE, BIN</p>
+             <Upload className="w-24 h-24 text-primary animate-bounce mb-6" />
+             <h2 className="text-display-small text-on-primary-container font-medium tracking-normal mb-2">Solte o arquivo binário</h2>
+             <p className="text-title-medium text-on-primary-container/80">ROMs, ELF, EXE, BIN</p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -2557,10 +2557,10 @@ int process_status_logic(EntityHealth* entity_ptr) {
             <motion.div 
               initial={{ x: 20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
-              className="px-2 py-1 bg-black/80 border border-cyan-500/20 rounded shadow-2xl backdrop-blur-md flex items-center gap-2"
+              className="px-3 py-1.5 bg-surface-container border border-outline-variant rounded-full shadow-elevation-1 backdrop-blur-md flex items-center gap-2"
             >
-               <div className={`w-2 h-2 rounded-full animate-pulse ${health.status === 'GREEN' ? 'bg-green-500' : 'bg-red-500'}`} />
-               <span className="text-[10px] tracking-tighter opacity-70">CORE_LINK: UP | {health.uptime.toFixed(0)}s | {health.eventsPerSecond.toFixed(1)} EPS</span>
+               <div className={`w-2.5 h-2.5 rounded-full animate-pulse ${health.status === 'GREEN' ? 'bg-primary' : 'bg-error'}`} />
+               <span className="text-label-small font-medium opacity-80">CORE_LINK: UP | {health.uptime.toFixed(0)}s | {health.eventsPerSecond.toFixed(1)} EPS</span>
             </motion.div>
          )}
       </div>
@@ -2573,14 +2573,14 @@ int process_status_logic(EntityHealth* entity_ptr) {
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className={`fixed bottom-8 right-8 z-[200] px-6 py-4 rounded-2xl shadow-2xl border flex items-center gap-4 ${
-              toast.type === 'error' ? 'bg-red-500/10 border-red-500/30 text-red-400' :
-              toast.type === 'success' ? 'bg-green-500/10 border-green-500/30 text-green-400' :
-              'bg-cyan-500/10 border-cyan-500/30 text-cyan-400'
+            className={`fixed bottom-8 right-8 z-[200] px-6 py-4 rounded-xl shadow-elevation-3 flex items-center gap-3 ${
+              toast.type === 'error' ? 'bg-error-container text-on-error-container' :
+              toast.type === 'success' ? 'bg-surface-container-high text-on-surface' :
+              'bg-surface-container-high text-on-surface'
             }`}
           >
-            <Zap className={`w-5 h-5 ${toast.type === 'error' ? 'text-red-400' : 'text-cyan-400'}`} />
-            <span className="font-bold text-sm tracking-tight">{toast.msg}</span>
+            <Zap className={`w-5 h-5 ${toast.type === 'error' ? 'text-error' : 'text-primary'}`} />
+            <span className="text-body-medium font-medium">{toast.msg}</span>
           </motion.div>
         )}
       </AnimatePresence>
@@ -2593,10 +2593,10 @@ int process_status_logic(EntityHealth* entity_ptr) {
       />
 
       {analysisResult && (
-        <div className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-8">
-          <div className="bg-[#0f0f0f] border border-yellow-500/30 rounded-xl w-full max-w-4xl max-h-[85vh] flex flex-col relative shadow-[0_0_50px_rgba(234,179,8,0.15)] flex-shrink-0">
-            <div className="flex justify-between items-center p-6 border-b border-white/10 shrink-0">
-               <div className="text-yellow-500 font-bold uppercase tracking-widest flex items-center gap-2">
+        <div className="absolute inset-0 z-[100] bg-scrim/80 backdrop-blur-md flex items-center justify-center p-8">
+          <div className="bg-surface border border-outline-variant rounded-[24px] w-full max-w-4xl max-h-[85vh] flex flex-col relative shadow-elevation-3 flex-shrink-0">
+            <div className="flex justify-between items-center p-6 border-b border-outline-variant shrink-0">
+               <div className="text-primary font-medium text-title-medium flex items-center gap-2">
                  <BrainCircuit className="w-5 h-5" /> ASM Analysis Report
                </div>
                <button 

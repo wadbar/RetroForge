@@ -244,38 +244,38 @@ export default function ProjectDashboard({ activeProjectId, onSelectProject, onS
           key={project.id}
           onClick={() => onSelectProject(project.id)}
           aria-label={`Selecionar projeto ${project.name}`}
-          className={`bg-[#141414] border rounded-2xl p-6 group transition-all relative text-left w-full ${
-            activeProjectId === project.id ? 'border-cyan-500 shadow-[0_0_20px_rgba(6,182,212,0.1)]' : 'border-white/5'
+          className={`flex flex-col bg-surface-container-low border rounded-3xl p-6 group transition-all relative text-left w-full hover:shadow-elevation-1 min-h-[160px] ${
+            activeProjectId === project.id ? 'border-primary ring-1 ring-primary shadow-elevation-2' : 'border-outline-variant hover:border-outline'
           }`}
         >
-          <div className="flex justify-between items-start mb-6">
-            <Monitor className="w-5 h-5 text-cyan-400" />
-            <div className="flex flex-col items-end mr-8 gap-2">
-              <div className="flex items-center gap-2" title={`Status da Análise: ${project.analysisStatus}`}>
-                 <span className={`text-[10px] font-bold uppercase ${project.analysisStatus === 'ready' ? 'text-green-500' : project.analysisStatus === 'scanning' ? 'text-blue-400' : project.analysisStatus === 'error' ? 'text-red-500' : 'text-orange-400 animate-pulse'}`}>
+          <div className="flex justify-between items-start mb-6 w-full">
+            <div className={`p-3 rounded-xl ${activeProjectId === project.id ? 'bg-primary text-on-primary' : 'bg-secondary-container text-on-secondary-container'}`}>
+              <Monitor className="w-6 h-6" />
+            </div>
+            <div className="flex flex-col items-end mr-2 gap-1 text-right">
+              <div className="flex items-center gap-1.5" title={`Status da Análise: ${project.analysisStatus}`}>
+                 <span className={`text-label-small font-medium ${project.analysisStatus === 'ready' ? 'text-green-600 dark:text-green-400' : project.analysisStatus === 'scanning' ? 'text-primary' : project.analysisStatus === 'error' ? 'text-error' : 'text-orange-500'}`}>
                     {project.analysisStatus === 'ready' ? 'Pronto' : project.analysisStatus === 'scanning' ? 'Analisando' : project.analysisStatus === 'error' ? 'Erro' : 'Pendente'}
                  </span>
-                 {project.analysisStatus === 'ready' ? <Zap className="w-3 h-3 text-green-500" /> : <Loader2 className="w-3 h-3 text-orange-400" />}
+                 {project.analysisStatus === 'ready' ? <Zap className="w-3 h-3 text-green-600 dark:text-green-400" /> : <Loader2 className="w-3 h-3 text-primary animate-spin" />}
               </div>
-              <span className="text-[10px] font-mono text-gray-500">{project.platform}</span>
-              <span className={`text-[10px] font-bold uppercase ${project.status === 'Concluído' ? 'text-green-500' : 'text-cyan-400 animate-pulse'}`} title={`Progresso do Projeto: ${project.status}`}>
-                {project.status === 'Concluído' ? 'Concluído' : project.status}
-              </span>
+              <span className="text-label-small font-mono text-on-surface-variant bg-surface-variant px-2 py-0.5 rounded-md">{project.platform}</span>
             </div>
           </div>
-          <h3 className="text-white text-xl font-bold mb-1 truncate">{project.name}</h3>
+
+          <h3 className="text-title-large text-on-surface mb-2 truncate w-full">{project.name}</h3>
           
-          <div className="space-y-4 pt-4 border-t border-white/5">
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-500 uppercase tracking-wider font-bold">Integridade</span>
-                <span className="text-white font-mono">{project.health}%</span>
+          <div className="mt-auto pt-4 flex items-center justify-between w-full border-t border-outline-variant/30">
+            <div className="flex flex-col w-full gap-2">
+              <div className="flex justify-between items-center w-full">
+                <span className="text-label-small font-medium text-on-surface-variant">Integridade</span>
+                <span className="text-label-medium font-medium text-on-surface">{project.health}%</span>
               </div>
-              <div className="h-1.5 w-full bg-black rounded-full overflow-hidden flex">
+              <div className="h-2 w-full bg-surface-variant rounded-full overflow-hidden">
                 <motion.div 
                   initial={{ width: 0 }}
                   animate={{ width: `${project.health}%` }}
-                  className={`h-full ${project.health > 80 ? 'bg-green-500' : 'bg-orange-500'}`}
+                  className={`h-full rounded-full ${project.health > 80 ? 'bg-primary' : 'bg-error'}`}
                 />
               </div>
             </div>
@@ -287,28 +287,48 @@ export default function ProjectDashboard({ activeProjectId, onSelectProject, onS
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-20">
-      <div className="flex justify-between items-end">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-8">
         <div>
-          <h1 className="text-4xl font-bold text-white tracking-tight">Hub</h1>
+          <h1 className="text-display-small text-on-background tracking-normal mb-1">Hub de Projetos</h1>
+          <p className="text-body-large text-on-surface-variant">Gerencie seus processos de extração e recompilação</p>
         </div>
         <div className="flex gap-4">
           <input type="file" className="hidden" ref={agentInputRef} onChange={(e) => { if (e.target.files?.[0]) startAutomatedAgent(e.target.files[0]); }} />
-          <button onClick={() => agentInputRef.current?.click()} className="px-6 py-2 bg-gradient-to-r from-cyan-500 to-purple-500 hover:from-cyan-400 hover:to-purple-400 text-black font-bold uppercase tracking-wider rounded-xl shadow-[0_0_20px_rgba(6,182,212,0.4)] flex items-center gap-2 transition-all">
-            <Cpu className="w-5 h-5" /> IA Automática
+          <button 
+            onClick={() => agentInputRef.current?.click()} 
+            className="h-12 px-6 bg-primary text-on-primary rounded-full font-medium shadow-elevation-1 hover:shadow-elevation-2 hover:bg-primary/90 transition-all flex items-center gap-2 tracking-wide"
+          >
+            <Cpu className="w-5 h-5" /> 
+            IA Automática
           </button>
         </div>
       </div>
 
-      {projectGrid}
+      {projects.length === 0 ? (
+        <div className="flex flex-col items-center justify-center p-12 bg-surface border border-dashed border-outline-variant rounded-[32px] text-center">
+            <div className="w-20 h-20 bg-secondary-container rounded-full flex items-center justify-center mb-6">
+                <Plus className="w-10 h-10 text-on-secondary-container" />
+            </div>
+            <h2 className="text-headline-small text-on-surface mb-2">Nenhum projeto encontrado</h2>
+            <p className="text-body-large text-on-surface-variant max-w-md">Para começar a trabalhar, inicie um novo projeto ou importe código existente usando o assistente de IA automática.</p>
+        </div>
+      ) : projectGrid}
 
       <AnimatePresence>
         {toastMsg && (
-          <motion.div initial={{ opacity: 0, y: 50, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.9, y: 50 }}
-            className={`fixed bottom-6 right-6 p-4 rounded-xl shadow-2xl flex items-center gap-3 z-50 ${toastMsg.type === 'error' ? 'bg-red-500/20 text-red-100 border border-red-500/50' : 'bg-cyan-500/20 text-cyan-100 border border-cyan-500/50'}`}
+          <motion.div 
+            initial={{ opacity: 0, y: 50, scale: 0.9 }} 
+            animate={{ opacity: 1, y: 0, scale: 1 }} 
+            exit={{ opacity: 0, scale: 0.9, y: 50 }}
+            className={`fixed bottom-8 right-8 px-6 py-4 rounded-xl shadow-elevation-3 flex items-center gap-3 z-50 ${
+                toastMsg.type === 'error' 
+                ? 'bg-error-container text-on-error-container' 
+                : 'bg-surface-container-high text-on-surface'
+            }`}
             role="alert"
           >
-            {toastMsg.type === 'error' ? <X className="w-5 h-5 text-red-500" /> : <Activity className="w-5 h-5 text-cyan-400" />}
-            <p className="text-sm font-medium">{toastMsg.text}</p>
+            {toastMsg.type === 'error' ? <X className="w-5 h-5 text-error" /> : <Activity className="w-5 h-5 text-primary" />}
+            <span className="text-body-medium font-medium">{toastMsg.text}</span>
           </motion.div>
         )}
       </AnimatePresence>

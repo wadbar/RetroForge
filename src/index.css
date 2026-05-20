@@ -1,22 +1,114 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
 @import "tailwindcss";
 
+:root {
+  /* Light Theme - Deep Purple Baseline */
+  --md-sys-color-primary: #6750A4;
+  --md-sys-color-on-primary: #FFFFFF;
+  --md-sys-color-primary-container: #EADDFF;
+  --md-sys-color-on-primary-container: #21005D;
+  --md-sys-color-secondary: #625B71;
+  --md-sys-color-on-secondary: #FFFFFF;
+  --md-sys-color-secondary-container: #E8DEF8;
+  --md-sys-color-on-secondary-container: #1D192B;
+  --md-sys-color-tertiary: #7D5260;
+  --md-sys-color-on-tertiary: #FFFFFF;
+  --md-sys-color-background: #FEF7FF;
+  --md-sys-color-on-background: #1D1B20;
+  --md-sys-color-surface: #FEF7FF;
+  --md-sys-color-on-surface: #1D1B20;
+  --md-sys-color-surface-variant: #E7E0EC;
+  --md-sys-color-on-surface-variant: #49454F;
+  --md-sys-color-surface-container-lowest: #FFFFFF;
+  --md-sys-color-surface-container-low: #F7F2FA;
+  --md-sys-color-surface-container: #F3EDF7;
+  --md-sys-color-surface-container-high: #ECE6F0;
+  --md-sys-color-surface-container-highest: #E6E0E9;
+  --md-sys-color-outline: #79747E;
+  --md-sys-color-outline-variant: #CAC4D0;
+}
+
+[data-theme="dark"] {
+  /* Dark Theme */
+  --md-sys-color-primary: #D0BCFF;
+  --md-sys-color-on-primary: #381E72;
+  --md-sys-color-primary-container: #4F378B;
+  --md-sys-color-on-primary-container: #EADDFF;
+  --md-sys-color-secondary: #CCC2DC;
+  --md-sys-color-on-secondary: #332D41;
+  --md-sys-color-secondary-container: #4A4458;
+  --md-sys-color-on-secondary-container: #E8DEF8;
+  --md-sys-color-tertiary: #EFB8C8;
+  --md-sys-color-on-tertiary: #492532;
+  --md-sys-color-background: #141218;
+  --md-sys-color-on-background: #E6E0E9;
+  --md-sys-color-surface: #141218;
+  --md-sys-color-on-surface: #E6E0E9;
+  --md-sys-color-surface-variant: #49454F;
+  --md-sys-color-on-surface-variant: #CAC4D0;
+  --md-sys-color-surface-container-lowest: #0F0D13;
+  --md-sys-color-surface-container-low: #1D1B20;
+  --md-sys-color-surface-container: #211F26;
+  --md-sys-color-surface-container-high: #2B2930;
+  --md-sys-color-surface-container-highest: #36343B;
+  --md-sys-color-outline: #938F99;
+  --md-sys-color-outline-variant: #49454F;
+}
+
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-primary: var(--md-sys-color-primary);
+  --color-on-primary: var(--md-sys-color-on-primary);
+  --color-primary-container: var(--md-sys-color-primary-container);
+  --color-on-primary-container: var(--md-sys-color-on-primary-container);
+  --color-secondary: var(--md-sys-color-secondary);
+  --color-on-secondary: var(--md-sys-color-on-secondary);
+  --color-secondary-container: var(--md-sys-color-secondary-container);
+  --color-on-secondary-container: var(--md-sys-color-on-secondary-container);
+  --color-tertiary: var(--md-sys-color-tertiary);
+  --color-background: var(--md-sys-color-background);
+  --color-on-background: var(--md-sys-color-on-background);
+  --color-surface: var(--md-sys-color-surface);
+  --color-on-surface: var(--md-sys-color-on-surface);
+  --color-surface-variant: var(--md-sys-color-surface-variant);
+  --color-on-surface-variant: var(--md-sys-color-on-surface-variant);
+  --color-surface-container: var(--md-sys-color-surface-container);
+  --color-surface-container-low: var(--md-sys-color-surface-container-low);
+  --color-surface-container-high: var(--md-sys-color-surface-container-high);
+  --color-surface-container-highest: var(--md-sys-color-surface-container-highest);
+  --color-outline: var(--md-sys-color-outline);
+  --color-outline-variant: var(--md-sys-color-outline-variant);
 }
 
 @layer base {
   body {
-    @apply bg-[#050505] text-gray-300 font-sans selection:bg-cyan-500/30 selection:text-cyan-200 overflow-hidden;
-    background-image: 
-      radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
-      radial-gradient(at 50% 0%, hsla(225,39%,30%,0.05) 0, transparent 50%), 
-      radial-gradient(at 100% 0%, hsla(339,49%,30%,0.02) 0, transparent 50%);
+    @apply bg-background text-on-background font-sans selection:bg-primary-container selection:text-on-primary-container overflow-hidden transition-colors duration-300;
   }
 }
 
 @layer utilities {
+  .shadow-elevation-1 { box-shadow: 0px 1px 2px 0px rgba(0, 0, 0, 0.3), 0px 1px 3px 1px rgba(0, 0, 0, 0.15); }
+  .shadow-elevation-2 { box-shadow: 0px 1px 2px 0px rgba(0, 0, 0, 0.3), 0px 2px 6px 2px rgba(0, 0, 0, 0.15); }
+  .shadow-elevation-3 { box-shadow: 0px 1px 3px 0px rgba(0, 0, 0, 0.3), 0px 4px 8px 3px rgba(0, 0, 0, 0.15); }
+
+  .text-display-large { @apply text-[57px] leading-[64px] tracking-[-0.25px]; }
+  .text-display-medium { @apply text-[45px] leading-[52px] tracking-normal; }
+  .text-display-small { @apply text-[36px] leading-[44px] tracking-normal; }
+  .text-headline-large { @apply text-[32px] leading-[40px] tracking-normal; }
+  .text-headline-medium { @apply text-[28px] leading-[36px] tracking-normal; }
+  .text-headline-small { @apply text-[24px] leading-[32px] tracking-normal; }
+  .text-title-large { @apply text-[22px] leading-[28px] tracking-normal; }
+  .text-title-medium { @apply text-[16px] leading-[24px] tracking-[0.15px]; }
+  .text-title-small { @apply text-[14px] leading-[20px] tracking-[0.1px]; }
+  .text-label-large { @apply text-[14px] leading-[20px] tracking-[0.1px]; }
+  .text-label-medium { @apply text-[12px] leading-[16px] tracking-[0.5px]; }
+  .text-label-small { @apply text-[11px] leading-[16px] tracking-[0.5px]; }
+  .text-body-large { @apply text-[16px] leading-[24px] tracking-[0.5px]; }
+  .text-body-medium { @apply text-[14px] leading-[20px] tracking-[0.25px]; }
+  .text-body-small { @apply text-[12px] leading-[16px] tracking-[0.4px]; }
+
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
     height: 6px;

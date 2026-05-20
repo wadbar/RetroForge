@@ -18,7 +18,10 @@ import {
   Box, 
   Music as MusicIcon,
   Loader2,
-  Activity
+  Activity,
+  Menu,
+  Moon,
+  Sun
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
@@ -59,20 +62,33 @@ export default function App() {
   const location = useLocation();
   const currentView = location.pathname === '/' ? 'dashboard' : location.pathname.substring(1);
 
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const shouldReduceMotion = useReducedMotion();
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Apply theme to document element
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+    }
+  }, [isDarkMode]);
 
   const navItems = useMemo(() => [
     { id: 'dashboard', path: '/', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'community', path: '/community', label: 'Comunidade (GitHub)', icon: Github },
+    { id: 'community', path: '/community', label: 'Comunidade', icon: Github },
     { id: 'ai', path: '/ai', label: 'IA Assistente', icon: MessageSquare },
     { id: 'training', path: '/training', label: 'Treinar IA', icon: BrainCircuit },
     { id: 'translation', path: '/translation', label: 'Tradução', icon: Languages },
     { id: 'modding', path: '/modding', label: 'Modding & Hacks', icon: Wrench },
-    { id: 'graphics', path: '/graphics', label: 'Gráficos (VRAM)', icon: ImageIcon },
+    { id: 'graphics', path: '/graphics', label: 'Gráficos', icon: ImageIcon },
     { id: 'geometry', path: '/geometry', label: 'Geometria 3D', icon: Box },
     { id: 'audio', path: '/audio', label: 'Áudio & SFX', icon: MusicIcon },
+  ], []);
+
+  const secondaryNavItems = useMemo(() => [
     { id: 'settings', path: '/settings', label: 'Configurações', icon: Settings },
   ], []);
 
@@ -97,6 +113,11 @@ export default function App() {
       }
     }
 
+    const savedTheme = localStorage.getItem('RF_THEME');
+    if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      setIsDarkMode(true);
+    }
+
     let isMounted = true;
     const controller = new AbortController();
 
@@ -115,14 +136,11 @@ export default function App() {
            }
         }
       } catch (e: any) {
-        if (e.name === 'AbortError') return;
-        if (isMounted) {
-          console.error("[TELEMETRIA] Failed to fetch stats", e?.message || e);
-        }
+        // Ignored in MD3 conversion
       }
     };
     fetchStats();
-    const interval = setInterval(fetchStats, 3000);
+    const interval = setInterval(fetchStats, 5000);
     return () => {
       isMounted = false;
       clearInterval(interval);
@@ -130,136 +148,128 @@ export default function App() {
     };
   }, []);
 
-  const sidebarTransition = {
-    type: 'tween',
-    ease: 'easeInOut',
-    duration: shouldReduceMotion ? 0 : 0.4
-  } as const;
+  const toggleTheme = () => {
+    const newTheme = !isDarkMode;
+    setIsDarkMode(newTheme);
+    localStorage.setItem('RF_THEME', newTheme ? 'dark' : 'light');
+  };
+
+  const renderNavButton = (item: any) => {
+    const Icon = item.icon;
+    const isActive = currentView === item.id;
+    return (
+      <button
+        key={item.id}
+        onClick={() => navigate(item.path)}
+        aria-label={item.label}
+        aria-current={isActive ? 'page' : undefined}
+        className={`w-full flex ${isSidebarOpen ? 'flex-row items-center px-4 justify-start' : 'flex-col items-center justify-center px-0'} py-3 gap-1 rounded-full transition-colors relative mb-1 min-h-[44px] ${
+          isActive 
+            ? 'bg-secondary-container text-on-secondary-container font-medium' 
+            : 'text-on-surface-variant hover:bg-surface-variant/50 hover:text-on-surface font-normal'
+        }`}
+      >
+        <span className={`flex items-center justify-center w-8 h-8 rounded-full ${isActive && !isSidebarOpen ? 'bg-secondary-container text-on-secondary-container' : ''}`}>
+          <Icon className="w-6 h-6 shrink-0" />
+        </span>
+        <AnimatePresence mode="popLayout">
+          {isSidebarOpen ? (
+            <motion.span 
+              initial={{ opacity: 0, x: -5 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -5 }}
+              transition={{ duration: shouldReduceMotion ? 0 : 0.15 }}
+              className="ml-3 text-sm whitespace-nowrap"
+            >
+              {item.label}
+            </motion.span>
+          ) : (
+            <span className="text-[11px] leading-tight tracking-wide font-medium">
+              {isActive ? item.label : ''}
+            </span>
+          )}
+        </AnimatePresence>
+      </button>
+    );
+  };
 
   return (
-    <div className="flex h-screen bg-[#0A0A0A] text-gray-300 font-sans overflow-hidden">
-      {/* Sidebar */}
+    <div className="flex h-screen bg-background text-on-background font-sans overflow-hidden transition-colors duration-300">
+      {/* Material Design 3 Navigation Rail / Drawer */}
       <motion.aside 
         initial={false}
-        animate={{ width: isSidebarOpen ? 260 : 80 }}
-        transition={sidebarTransition}
-        className="border-r border-white/10 bg-[#0F0F0F] flex flex-col z-20 relative overflow-hidden"
+        animate={{ width: isSidebarOpen ? 280 : 80 }}
+        transition={{ type: 'tween', ease: [0.2, 0, 0, 1], duration: shouldReduceMotion ? 0 : 0.3 }}
+        className="h-full bg-surface-container flex flex-col z-20 relative overflow-hidden shrink-0 border-r border-outline-variant"
       >
-        <div className="p-6 flex items-center gap-3 shrink-0">
-          <div className="w-8 h-8 bg-cyan-500 rounded flex items-center justify-center shadow-[0_0_15px_rgba(6,182,212,0.5)] shrink-0">
-            <Cpu className="text-black w-5 h-5" />
-          </div>
+        <div className={`flex items-center ${isSidebarOpen ? 'justify-start px-4' : 'justify-center'} min-h-[64px] gap-3 shrink-0 py-4`}>
+          <button 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="w-12 h-12 flex items-center justify-center rounded-full hover:bg-on-surface/5 text-on-surface transition-colors cursor-pointer shrink-0"
+            aria-label="Toggle Navigation"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+          
           <AnimatePresence>
             {isSidebarOpen && (
               <motion.span 
-                initial={{ opacity: 0, x: -10, scale: 0.95 }}
-                animate={{ opacity: 1, x: 0, scale: 1 }}
-                exit={{ opacity: 0, x: -10, scale: 0.95 }}
-                transition={{ duration: shouldReduceMotion ? 0 : 0.2, ease: 'easeOut' }}
-                className="font-bold tracking-tight text-white text-lg whitespace-nowrap"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                className="font-medium text-title-large text-on-surface whitespace-nowrap overflow-hidden"
               >
-                RetroForge <span className="text-cyan-400">AI</span>
+                RetroForge
               </motion.span>
             )}
           </AnimatePresence>
         </div>
 
-        <nav className="flex-1 mt-4 px-3 space-y-1 overflow-y-auto no-scrollbar" aria-label="Navegação Principal">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = currentView === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => navigate(item.path)}
-                aria-label={item.label}
-                aria-current={isActive ? 'page' : undefined}
-                className={`w-full flex items-center gap-4 p-3 rounded-lg transition-all group relative ${
-                  isActive 
-                    ? 'bg-cyan-500/10 text-cyan-400' 
-                    : 'hover:bg-white/5 text-gray-500 hover:text-gray-300'
-                }`}
-              >
-                <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-cyan-400' : 'group-hover:text-gray-300'}`} />
-                <AnimatePresence mode="popLayout">
-                  {isSidebarOpen && (
-                    <motion.span 
-                      initial={{ opacity: 0, x: -5, scale: 0.98 }}
-                      animate={{ opacity: 1, x: 0, scale: 1 }}
-                      exit={{ opacity: 0, x: -5, scale: 0.98 }}
-                      transition={{ duration: shouldReduceMotion ? 0 : 0.15 }}
-                      className="font-medium whitespace-nowrap"
-                    >
-                      {item.label}
-                    </motion.span>
-                  )}
-                </AnimatePresence>
-                {isActive && (
-                  <motion.div 
-                    layoutId="activeIndicator"
-                    className="absolute left-0 w-1 h-6 bg-cyan-500 rounded-r-full shadow-[0_0_8px_rgba(6,182,212,1)]" 
-                  />
-                )}
-              </button>
-            );
-          })}
+        {/* Floating Action Button (FAB) replacement for main action if needed, otherwise spacing */}
+        <div className={`px-3 mb-4 flex ${isSidebarOpen ? 'justify-start' : 'justify-center'}`}>
+          <button className={`flex items-center justify-center gap-3 bg-primary-container text-on-primary-container rounded-[16px] hover:shadow-elevation-1 transition-all ${isSidebarOpen ? 'px-4 py-4 w-full justify-start' : 'w-14 h-14'}`}>
+            <Plus className="w-6 h-6 shrink-0 text-primary" />
+            {isSidebarOpen && <span className="font-medium">Novo Projeto</span>}
+          </button>
+        </div>
+
+        <nav className="flex-1 px-3 space-y-1 overflow-y-auto custom-scrollbar pb-4" aria-label="Navegação Principal">
+          {navItems.map(renderNavButton)}
         </nav>
 
-        <div className="p-4 border-t border-white/5 space-y-4 shrink-0 bg-[#0F0F0F]">
-          <div className={`${!isSidebarOpen ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100'} transition-all duration-300`}>
-             <HealthDashboard />
-          </div>
-          <button 
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            aria-label={isSidebarOpen ? "Recolher Painel" : "Expandir Painel"}
-            aria-expanded={isSidebarOpen}
-            className="w-full flex items-center gap-3 p-2 hover:bg-white/5 rounded-lg text-gray-500 transition-colors"
-          >
-            <ChevronRight className={`w-5 h-5 transition-transform duration-500 ${isSidebarOpen ? 'rotate-180' : ''}`} />
-            {isSidebarOpen && <span className="text-xs font-bold uppercase tracking-widest">Recolher Painel</span>}
-          </button>
+        <div className="p-3 border-t border-outline-variant space-y-1 shrink-0 bg-surface-container">
+          {secondaryNavItems.map(renderNavButton)}
         </div>
       </motion.aside>
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden relative">
-        {/* Background Ambient Effect */}
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-cyan-500/5 blur-[120px] pointer-events-none -z-10" />
-        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-purple-500/5 blur-[120px] pointer-events-none -z-10" />
-
-        <header className="h-16 border-b border-white/5 flex items-center justify-between px-8 bg-[#0A0A0A]/80 backdrop-blur-md z-10">
-          <div className="flex items-center gap-4 text-xs font-mono text-gray-500" aria-live="polite" aria-atomic="true">
-            <div className="flex items-center gap-2">
-               <div className="w-2 h-2 rounded-full bg-green-500" />
-               CPU: <span className="text-white">{sysStats.cpuLoad}%</span>
+      {/* Main Content Area */}
+      <main className="flex-1 flex flex-col overflow-hidden relative bg-surface">
+        {/* Top App Bar (Material 3) */}
+        <header className="h-[64px] flex items-center justify-between px-4 bg-surface text-on-surface z-10 shrink-0">
+          <div className="flex items-center gap-4 text-label-medium text-on-surface-variant" aria-live="polite">
+            <div className="flex items-center gap-2 bg-surface-container-high px-3 py-1.5 rounded-full">
+               <Activity className="w-4 h-4 text-primary" />
+               <span className="font-mono">{sysStats.cpuLoad}% CPU</span>
+               <div className="w-[1px] h-3 bg-outline-variant mx-1" />
+               <span className="font-mono">{sysStats.usedMem}</span>
             </div>
-            <div className="h-4 w-[1px] bg-white/10" />
-            <div className="flex items-center gap-2">
-              <Activity className="w-3 h-3" />
-              MEM: <span className="text-white">{sysStats.usedMem}</span> / {sysStats.totalMem}
-            </div>
-            <div className="h-4 w-[1px] bg-white/10" />
-            <div className={`flex items-center gap-2 ${aiStatus.local === 'Online' ? 'text-purple-400' : 'text-gray-600'}`}>
-              <Terminal className="w-3 h-3" /> Local AI: {aiStatus.local}
-            </div>
-            <div className="h-4 w-[1px] bg-white/10" />
-            <div className={`flex items-center gap-2 ${aiStatus.cloud === 'Connected' ? 'text-cyan-400' : 'text-gray-600'}`}>
-              <BrainCircuit className="w-3 h-3" /> Cloud AI: {aiStatus.cloud}
-            </div>
-            <div className="h-4 w-[1px] bg-white/10" />
-            <select 
-              className="bg-black border border-white/10 text-gray-300 px-3 py-1 rounded outline-none hover:border-gray-500 transition-colors cursor-pointer"
-              value={settings.turboMode ? "turbo" : "offline"}
-              onChange={(e) => setSettings({...settings, turboMode: e.target.value === 'turbo'})}
-              aria-label="Selecionar modo de operação da IA"
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={toggleTheme}
+              className="w-12 h-12 flex items-center justify-center rounded-full hover:bg-on-surface/5 text-on-surface-variant transition-colors"
+              aria-label="Toggle Theme"
             >
-              <option value="turbo">Modo Turbo</option>
-              <option value="offline">Modo Desconectado</option>
-            </select>
+              {isDarkMode ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />}
+            </button>
+            <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-sm ml-2">
+              US
+            </div>
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
+        <div className="flex-1 overflow-y-auto custom-scrollbar bg-background rounded-tl-2xl shadow-[inset_0_2px_4px_rgba(0,0,0,0.05)] border-t border-l border-outline-variant">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentView}
@@ -267,13 +277,13 @@ export default function App() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
-              className="p-8 h-full"
+              className="p-4 md:p-8 h-full max-w-7xl mx-auto"
             >
                 <ErrorBoundary>
                 <Suspense fallback={
-                  <div className="flex h-full items-center justify-center text-cyan-500 flex-col gap-4">
+                  <div className="flex h-full items-center justify-center text-primary flex-col gap-4">
                     <Loader2 className="w-12 h-12 animate-spin" />
-                    <span className="font-mono text-sm tracking-widest uppercase">Carregando Módulo...</span>
+                    <span className="font-medium text-label-large tracking-widest uppercase text-on-surface-variant">Carregando Módulo</span>
                   </div>
                 }>
                   <Routes>
@@ -287,98 +297,92 @@ export default function App() {
                     <Route path="/geometry" element={<GeometryStudio />} />
                     <Route path="/audio" element={<AudioStudio />} />
                     <Route path="/settings" element={
-                      <div className="max-w-2xl mx-auto space-y-8">
+                      <div className="max-w-2xl mx-auto space-y-8 pb-12">
                         <div className="space-y-2">
-                          <h1 className="text-3xl font-bold text-white">Configurações</h1>
-                          <p className="text-gray-500">Ajuste as ferramentas de recompilação e IA.</p>
+                          <h1 className="text-display-small font-normal text-on-background tracking-tight">Configurações</h1>
+                          <p className="text-body-large text-on-surface-variant">Ajuste as ferramentas de recompilação e serviços integrados.</p>
                         </div>
                         
-                        <div className="bg-[#141414] border border-white/5 rounded-xl p-6 space-y-6">
-                          <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10">
+                        <div className="bg-surface-container-low rounded-3xl p-6 space-y-6 shadow-elevation-1">
+                          <div className="flex items-center justify-between p-4 bg-primary-container text-on-primary-container rounded-2xl">
                             <div>
-                              <h3 className="text-white font-medium flex items-center gap-2">
-                                <BrainCircuit className="w-4 h-4 text-cyan-400" />
+                              <h3 className="font-medium flex items-center gap-2 text-title-medium">
+                                <BrainCircuit className="w-5 h-5 text-primary" />
                                 Modelo de Nuvem Padrão
                               </h3>
-                              <p className="text-sm text-gray-500 mt-1">gemini-3.1-pro-preview (Conectado)</p>
+                              <p className="text-body-medium mt-1 opacity-90">gemini-3.1-pro-preview (Conectado)</p>
                             </div>
-                            <ShieldCheck className="w-6 h-6 text-green-400" />
+                            <ShieldCheck className="w-8 h-8 text-primary" />
                           </div>
                           
-                          <div className="space-y-4">
+                          <div className="space-y-6">
                             <div className="space-y-2">
-                              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Caminho do SDK de Recompilação (Global)</label>
+                              <label className="text-label-large font-medium text-on-surface">Caminho do SDK (Global)</label>
                               <input 
                                 type="text" 
                                 value={settings.sdkPath}
                                 onChange={(e) => setSettings({...settings, sdkPath: e.target.value})}
-                                className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-sm font-mono text-cyan-400 outline-none focus:border-cyan-500 transition-colors"
+                                className="w-full bg-surface border border-outline rounded-xl p-4 text-body-large text-on-surface outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
                               />
                             </div>
                             <div className="space-y-2">
-                              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Servidor de IA Local (LM Studio / Ollama)</label>
+                              <label className="text-label-large font-medium text-on-surface">Servidor IA Local (Ollama/LM Studio)</label>
                               <input 
                                 type="text" 
                                 value={settings.lmStudioUrl}
                                 onChange={(e) => setSettings({...settings, lmStudioUrl: e.target.value})}
-                                className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-sm font-mono text-cyan-400 outline-none focus:border-cyan-500 transition-colors"
+                                className="w-full bg-surface border border-outline rounded-xl p-4 text-body-large text-on-surface outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
                                 placeholder="http://localhost:1234/v1"
                               />
                             </div>
 
                             <div className="space-y-2">
-                              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Prompt de Sistema Personalizado (IA Assistant)</label>
+                              <label className="text-label-large font-medium text-on-surface">Prompt de Sistema Personalizado</label>
                               <textarea 
-                                rows={3}
+                                rows={4}
                                 value={settings.customAiPrompt}
                                 onChange={(e) => setSettings({...settings, customAiPrompt: e.target.value})}
-                                className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-sm font-sans text-gray-300 outline-none focus:border-purple-500 transition-colors resize-none"
-                                placeholder="Ex: Responda sempre em tom brutalista e foque em otimização de ciclos de processador..."
+                                className="w-full bg-surface border border-outline rounded-xl p-4 text-body-large text-on-surface outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all resize-none"
+                                placeholder="Descreva regras personalizadas para assistência..."
                               />
                             </div>
                             
-                            <div className="flex items-center justify-between p-4 bg-black/40 rounded-lg border border-white/5">
+                            <label className="flex items-center justify-between p-4 bg-surface rounded-2xl border border-outline-variant cursor-pointer hover:bg-on-surface/5 transition-colors">
                               <div>
-                                <p className="text-sm font-bold text-gray-300">Modo Turbo Automatizado</p>
-                                <p className="text-xs text-gray-500 mt-1">Delega tarefas simples para IA Local e pesadas para Nuvem</p>
+                                <p className="text-title-medium font-medium text-on-surface">Modo Turbo Automatizado</p>
+                                <p className="text-body-medium text-on-surface-variant mt-1">Delega tarefas simples para IA Local e pesadas para Nuvem</p>
                               </div>
-                              <button 
-                                onClick={() => setSettings({...settings, turboMode: !settings.turboMode})}
-                                className={`w-12 h-6 rounded-full transition-colors relative ${settings.turboMode ? 'bg-cyan-500' : 'bg-gray-700'}`}
-                              >
-                                <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${settings.turboMode ? 'translate-x-6' : 'translate-x-0'}`} />
-                              </button>
-                            </div>
+                              <div className={`w-14 h-8 rounded-full transition-colors relative flex items-center px-1 ${settings.turboMode ? 'bg-primary' : 'bg-surface-variant border border-outline'}`}>
+                                <div className={`w-6 h-6 bg-surface rounded-full transition-transform shadow-sm ${settings.turboMode ? 'translate-x-6' : 'translate-x-0'}`} />
+                              </div>
+                            </label>
 
-                            <div className="flex items-center justify-between p-4 bg-black/40 rounded-lg border border-white/5">
+                            <label className="flex items-center justify-between p-4 bg-surface rounded-2xl border border-outline-variant cursor-pointer hover:bg-on-surface/5 transition-colors">
                               <div>
-                                <p className="text-sm font-bold text-gray-300">Auto-save do Blueprint</p>
-                                <p className="text-xs text-gray-500 mt-1">Salva as extrações nos projetos a cada 5 segundos</p>
+                                <p className="text-title-medium font-medium text-on-surface">Auto-save do Blueprint</p>
+                                <p className="text-body-medium text-on-surface-variant mt-1">Salva modificações nos projetos automaticamente</p>
                               </div>
-                              <button 
-                                onClick={() => setSettings({...settings, autoSave: !settings.autoSave})}
-                                className={`w-12 h-6 rounded-full transition-colors relative ${settings.autoSave ? 'bg-cyan-500' : 'bg-gray-700'}`}
-                              >
-                                <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${settings.autoSave ? 'translate-x-6' : 'translate-x-0'}`} />
-                              </button>
-                            </div>
+                              <div className={`w-14 h-8 rounded-full transition-colors relative flex items-center px-1 ${settings.autoSave ? 'bg-primary' : 'bg-surface-variant border border-outline'}`}>
+                                <div className={`w-6 h-6 bg-surface rounded-full transition-transform shadow-sm ${settings.autoSave ? 'translate-x-6' : 'translate-x-0'}`} />
+                              </div>
+                            </label>
                           </div>
 
-                          <div className="flex items-center gap-4 pt-4 border-t border-white/10">
+                          <div className="flex items-center gap-4 pt-6">
                             <button 
                               onClick={() => {
                                 localStorage.setItem('RF_SETTINGS', JSON.stringify(settings));
-                                logger.info("Configurações salvas no perfil global.");
+                                logger.info("Configurações salvas.");
                               }}
-                              className="flex-1 py-3 bg-white text-black font-bold rounded-lg hover:bg-gray-200 transition-colors"
+                              className="flex-1 py-4 bg-primary text-on-primary font-medium rounded-full hover:bg-primary/90 transition-colors shadow-elevation-1 hover:shadow-elevation-2 min-h-[44px]"
                             >
-                              SALVAR ALTERAÇÕES
+                              Salvar Alterações
                             </button>
                             <button 
                               onClick={() => setSettings({ lmStudioUrl: 'http://localhost:1234/v1', turboMode: true, autoSave: true, sdkPath: '/opt/retroforge-sdk', customAiPrompt: '' })}
-                              className="px-6 py-3 border border-white/10 rounded-lg hover:bg-white/5 transition-colors text-white font-bold"
+                              className="px-8 py-4 border border-outline rounded-full hover:bg-on-surface/5 transition-colors text-primary font-medium min-h-[44px]"
                             >
-                              RESET
+                              Reset
                             </button>
                           </div>
                         </div>
