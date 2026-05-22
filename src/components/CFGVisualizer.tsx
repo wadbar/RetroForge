@@ -141,9 +141,9 @@ export const CFGVisualizer: React.FC<CFGVisualizerProps> = ({ nodes, links, onNo
   }, [nodes, links, onNodeSelect]);
 
   return (
-    <div className="w-full h-full border border-white/5 rounded-xl bg-black/40 overflow-hidden relative">
+    <div className="w-full h-full border border-outline-variant rounded-2xl bg-surface-container-low overflow-hidden relative shadow-inner">
       <div className="absolute top-4 left-4 flex gap-2">
-         <span className="flex items-center gap-1.5 text-[9px] font-bold text-cyan-400 bg-cyan-400/10 px-2 py-0.5 rounded border border-cyan-400/20">
+         <span className="flex items-center gap-1.5 text-label-small font-bold text-primary bg-primary-container px-2 py-0.5 rounded border border-primary/20">
             CFG: CONTROL FLOW GRAPH
          </span>
       </div>

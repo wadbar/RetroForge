@@ -94,7 +94,7 @@ export default function GeometryStudio() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
     // Fill background
-    ctx.fillStyle = '#050505';
+    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--md-sys-color-surface-container-highest') || '#050505';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const cx = canvas.width / 2;
@@ -128,7 +128,7 @@ export default function GeometryStudio() {
     }
 
     // Connect vertices (wireframe)
-    ctx.strokeStyle = '#00FFFF';
+    ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--md-sys-color-primary') || '#00FFFF';
     ctx.lineWidth = 1;
 
     const project = (x: number, y: number, z: number) => {
@@ -173,7 +173,7 @@ export default function GeometryStudio() {
     ctx.stroke();
 
     // Draw vertices dots
-    ctx.fillStyle = '#FF00FF';
+    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--md-sys-color-secondary') || '#FF00FF';
     vertices.forEach((v, i) => {
         let div = fileData ? 100 : 0.5;
         const p = project(v[0]/div, v[1]/div, v[2]/div);
@@ -202,22 +202,22 @@ export default function GeometryStudio() {
     <div className="max-w-6xl mx-auto flex flex-col h-full gap-6">
       <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
       
-      <div className="flex justify-between items-center bg-[#141414] p-6 rounded-2xl border border-white/5 shrink-0">
+      <div className="flex justify-between items-center bg-surface border border-outline-variant rounded-3xl p-6 shadow-elevation-1 shrink-0">
         <div className="flex gap-4 items-center">
-          <div className="p-3 bg-fuchsia-500/20 text-fuchsia-400 rounded-xl">
+          <div className="p-3 bg-secondary-container text-on-secondary-container rounded-2xl shadow-sm">
             <Box className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-white font-bold text-xl">Geometry & Level Wireframes</h2>
-            <p className="text-gray-500 text-sm">Visualizador de Display Lists e Vertices 3D crus direto da RAM/ROM.</p>
+            <h2 className="text-display-small text-on-surface mb-1">Geometry & Level Wireframes</h2>
+            <p className="text-body-large text-on-surface-variant">Visualizador de Display Lists e Vertices 3D crus direto da RAM/ROM.</p>
           </div>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-4">
            <button 
              onClick={() => fileInputRef.current?.click()}
-             className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-gray-300 font-bold flex items-center gap-2 hover:bg-white/10 transition-all"
+             className="px-6 py-3 bg-surface-container border border-outline-variant rounded-full text-on-surface font-medium flex items-center gap-2 hover:bg-surface-variant transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
            >
-             <Upload className="w-4 h-4" /> LOAD BINARY
+             <Upload className="w-5 h-5" /> LOAD BINARY
            </button>
            <button 
              onClick={() => {
@@ -225,25 +225,25 @@ export default function GeometryStudio() {
                  setVertexCount(120);
                  showToast("IA localizou Display List potencial em 0x04000!");
              }}
-             className="px-4 py-2 bg-fuchsia-500/10 border border-fuchsia-500/30 text-fuchsia-400 font-bold rounded-xl flex items-center gap-2 hover:bg-fuchsia-500 hover:text-white transition-all shadow-[0_0_15px_rgba(217,70,239,0.15)]"
+             className="px-6 py-3 bg-secondary hover:bg-secondary/90 text-on-secondary font-bold rounded-full flex items-center gap-2 transition-all shadow-elevation-1 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-surface"
            >
-             <Sparkles className="w-4 h-4" /> AI SCAN DISPLAY LISTS
+             <Sparkles className="w-5 h-5" /> AI SCAN DISPLAY LISTS
            </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1 min-h-0">
-        <div className="lg:col-span-1 space-y-4 overflow-y-auto custom-scrollbar pr-2">
-            <div className="bg-[#141414] border border-white/5 rounded-2xl p-6 space-y-6">
-                <h3 className="text-white font-bold text-sm tracking-widest uppercase flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-gray-400" /> Structure Settings
+        <div className="lg:col-span-1 border border-outline-variant rounded-3xl bg-surface-container-low p-6 space-y-6 overflow-y-auto custom-scrollbar">
+            <div className="space-y-6">
+                <h3 className="text-title-medium font-medium text-on-surface tracking-widest uppercase flex items-center gap-2">
+                    <Layers className="w-5 h-5 text-on-surface-variant" /> Structure Settings
                 </h3>
                 
-                <div className="space-y-4">
+                <div className="space-y-5">
                     <div className="space-y-2">
-                        <label className="text-[10px] text-gray-500 font-bold uppercase">Formato de Vértice</label>
+                        <label className="text-label-small text-on-surface-variant font-bold uppercase">Formato de Vértice</label>
                         <select 
-                            className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-sm text-cyan-400 outline-none focus:border-cyan-500 transition-all"
+                            className="w-full bg-surface-container-highest border border-outline-variant rounded-xl p-3 text-body-medium text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
                             value={vType}
                             onChange={(e) => setVType(e.target.value as any)}
                         >
@@ -253,9 +253,9 @@ export default function GeometryStudio() {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-[10px] text-gray-500 font-bold uppercase">Stride (Bytes por Vértice)</label>
+                        <label className="text-label-small text-on-surface-variant font-bold uppercase">Stride (Bytes por Vértice)</label>
                         <select 
-                            className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-sm text-cyan-400 outline-none focus:border-cyan-500 transition-all font-mono"
+                            className="w-full bg-surface-container-highest border border-outline-variant rounded-xl p-3 text-body-medium text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-mono"
                             value={stride}
                             onChange={(e) => setStride(Number(e.target.value))}
                         >
@@ -269,17 +269,17 @@ export default function GeometryStudio() {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-[10px] text-gray-500 font-bold uppercase">Endianness</label>
+                        <label className="text-label-small text-on-surface-variant font-bold uppercase">Endianness</label>
                         <div className="grid grid-cols-2 gap-2">
                             <button 
                                 onClick={() => setEndian('BE')}
-                                className={`py-2 text-[10px] font-bold rounded-lg border transition-all ${endian === 'BE' ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400' : 'bg-white/5 border-white/10 text-gray-500 hover:text-gray-300'}`}
+                                className={`py-3 text-label-small font-bold rounded-xl border transition-all ${endian === 'BE' ? 'bg-primary-container border-primary text-on-primary-container' : 'bg-surface-container-high border-outline-variant text-on-surface-variant hover:text-on-surface hover:bg-surface-variant'}`}
                             >
                                 BIG ENDIAN
                             </button>
                             <button 
                                 onClick={() => setEndian('LE')}
-                                className={`py-2 text-[10px] font-bold rounded-lg border transition-all ${endian === 'LE' ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400' : 'bg-white/5 border-white/10 text-gray-500 hover:text-gray-300'}`}
+                                className={`py-3 text-label-small font-bold rounded-xl border transition-all ${endian === 'LE' ? 'bg-primary-container border-primary text-on-primary-container' : 'bg-surface-container-high border-outline-variant text-on-surface-variant hover:text-on-surface hover:bg-surface-variant'}`}
                             >
                                 LITTLE ENDIAN
                             </button>
@@ -287,10 +287,10 @@ export default function GeometryStudio() {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-[10px] text-gray-500 font-bold uppercase">Offset Hexadecimal (Start)</label>
+                        <label className="text-label-small text-on-surface-variant font-bold uppercase">Offset Hexadecimal (Start)</label>
                         <input 
                             type="text" 
-                            className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-sm text-cyan-400 font-mono outline-none focus:border-cyan-500 uppercase" 
+                            className="w-full bg-surface-container-highest border border-outline-variant rounded-xl p-3 text-body-large text-primary font-mono outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all uppercase" 
                             value={offset.toString(16).toUpperCase()}
                             onChange={(e) => {
                                 const val = parseInt(e.target.value, 16);
@@ -300,10 +300,10 @@ export default function GeometryStudio() {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-[10px] text-gray-500 font-bold uppercase">Vertex Count Max</label>
+                        <label className="text-label-small text-on-surface-variant font-bold uppercase">Vertex Count Max</label>
                         <input 
                             type="number" 
-                            className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-sm text-cyan-400 outline-none focus:border-cyan-500" 
+                            className="w-full bg-surface-container-highest border border-outline-variant rounded-xl p-3 text-body-medium text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all" 
                             value={vertexCount}
                             onChange={(e) => setVertexCount(Number(e.target.value))}
                         />
@@ -311,35 +311,35 @@ export default function GeometryStudio() {
                 </div>
             </div>
 
-            <div className="bg-[#141414] border border-white/5 rounded-2xl p-6">
-               <h3 className="text-white font-bold text-sm tracking-widest uppercase flex items-center gap-2 mb-4">
-                    <Code className="w-4 h-4 text-gray-400" /> C++ Exporter
+            <div className="bg-surface border border-outline-variant rounded-3xl p-6 shadow-sm">
+               <h3 className="text-title-small font-medium text-on-surface tracking-widest uppercase flex items-center gap-2 mb-4">
+                    <Code className="w-5 h-5 text-on-surface-variant" /> Model Exporter
                </h3>
                <button 
                   onClick={exportOBJ}
                   disabled={!fileData}
-                  className="w-full bg-black/40 border border-white/10 text-cyan-400 font-mono text-xs rounded p-2 hover:bg-white/5 transition-colors disabled:opacity-50"
+                  className="w-full bg-primary-container hover:bg-primary-container/80 text-on-primary-container font-medium text-label-large rounded-xl p-3 transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-surface"
                >
-                  Export to .obj
+                  EXPORT TO .OBJ
                </button>
             </div>
         </div>
 
-        <div className="lg:col-span-3 bg-[#141414] border border-white/5 rounded-2xl flex flex-col min-h-0 overflow-hidden relative shadow-[inset_0_0_100px_rgba(0,0,0,0.8)]">
-            <div className="absolute top-4 left-4 z-10 flex gap-2">
-               <div className="bg-black/60 backdrop-blur border border-white/10 rounded p-2 text-[10px] font-mono text-cyan-400 flex flex-col gap-1">
+        <div className="lg:col-span-3 bg-surface-container-highest border border-outline-variant rounded-3xl flex flex-col min-h-0 overflow-hidden relative shadow-inner">
+            <div className="absolute top-6 left-6 z-10 flex gap-2">
+               <div className="bg-surface-container/80 backdrop-blur-md border border-outline-variant rounded-xl p-3 text-label-medium font-mono text-primary flex flex-col gap-1 shadow-sm">
                   <span>VERTICES: {fileData ? Math.min(vertexCount, Math.floor(fileData.length / 8)) : 8}</span>
                   <span>ROT X: {rotationX.toFixed(1)}°</span>
                   <span>ROT Y: {rotationY.toFixed(1)}°</span>
                </div>
             </div>
 
-            <div className="absolute top-4 right-4 z-10 flex gap-2">
-                <button onClick={() => setZoom(z => Math.max(10, z - 10))} className="p-2 bg-black/60 backdrop-blur border border-white/10 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors">
-                    <ZoomOut className="w-4 h-4" />
+            <div className="absolute top-6 right-6 z-10 flex gap-2">
+                <button onClick={() => setZoom(z => Math.max(10, z - 10))} className="p-3 bg-surface-container/80 backdrop-blur-md border border-outline-variant rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-variant transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                    <ZoomOut className="w-5 h-5" />
                 </button>
-                <button onClick={() => setZoom(z => z + 10)} className="p-2 bg-black/60 backdrop-blur border border-white/10 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors">
-                    <ZoomIn className="w-4 h-4" />
+                <button onClick={() => setZoom(z => z + 10)} className="p-3 bg-surface-container/80 backdrop-blur-md border border-outline-variant rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-variant transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                    <ZoomIn className="w-5 h-5" />
                 </button>
             </div>
 
@@ -347,9 +347,9 @@ export default function GeometryStudio() {
         </div>
       </div>
       {toastMsg && (
-        <div className="fixed bottom-6 right-6 p-4 rounded-xl shadow-2xl flex items-center gap-3 z-50 bg-fuchsia-500/20 text-fuchsia-100 border border-fuchsia-500/50 animate-in fade-in slide-in-from-bottom-5">
-           <Sparkles className="w-5 h-5 text-fuchsia-400" />
-           <p className="text-sm font-medium">{toastMsg}</p>
+        <div className="fixed bottom-8 right-8 p-6 rounded-2xl shadow-elevation-3 flex items-center gap-4 z-50 bg-secondary-container text-on-secondary-container border border-secondary/20 animate-in fade-in slide-in-from-bottom-5">
+           <Sparkles className="w-6 h-6 text-secondary" />
+           <p className="text-title-small font-medium">{toastMsg}</p>
         </div>
       )}
     </div>

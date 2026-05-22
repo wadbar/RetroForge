@@ -333,102 +333,103 @@ def retroforge_auto_mod(hex_buffer, offset, user_intent):
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-10">
-      <div className="flex items-center justify-between">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-            <BrainCircuit className="w-8 h-8 text-cyan-400" />
-            Laboratório de Treinamento IA
-          </h1>
-          <p className="text-gray-500">
-            Forneça manuais de SDK, dicionários de símbolos e decompilações manuais para treinar a IA a entender a arquitetura específica do seu jogo.
-          </p>
-        </div>
+      <div className="flex flex-col gap-4">
+        <h1 className="text-display-small font-medium text-on-background flex items-center gap-3">
+          <BrainCircuit className="w-10 h-10 text-primary" />
+          Laboratório de Treinamento IA
+        </h1>
+        <p className="text-body-large text-on-surface-variant max-w-2xl">
+          Forneça manuais de SDK, dicionários de símbolos e decompilações manuais para treinar a IA a entender a arquitetura específica do seu jogo.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Current Model Status */}
-        <div className="col-span-1 bg-[#141414] border border-white/5 rounded-2xl p-6 flex flex-col justify-between">
+        <div className="col-span-1 bg-surface-container-low border border-outline-variant rounded-3xl p-6 flex flex-col justify-between shadow-elevation-1">
           <div>
-            <h3 className="text-white font-bold mb-4 flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-green-400" />
+            <h3 className="text-title-large text-on-surface mb-6 flex items-center gap-2">
+              <ShieldCheck className="w-6 h-6 text-green-500" />
               Modelo Atual
             </h3>
             <div className="space-y-4">
-              <div className="bg-black/40 p-4 rounded-xl border border-white/5">
-                <div className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-1">Base Model</div>
-                <div className="text-cyan-400 font-mono">gemini-3.1-pro-preview</div>
+              <div className="bg-surface-container-high p-4 rounded-2xl border border-outline-variant shadow-sm">
+                <div className="text-label-small text-on-surface-variant uppercase tracking-widest mb-1.5">Base Model</div>
+                <div className="text-primary font-mono text-body-medium">gemini-3.1-pro</div>
               </div>
-              <div className="bg-black/40 p-4 rounded-xl border border-white/5">
-                <div className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-1">Especialidade / Contexto</div>
-                <div className="text-purple-400 font-mono text-sm">RetroForge-Core + User-Fine-Tune</div>
+              <div className="bg-surface-container-high p-4 rounded-2xl border border-outline-variant shadow-sm">
+                <div className="text-label-small text-on-surface-variant uppercase tracking-widest mb-1.5">Especialidade / Contexto</div>
+                <div className="text-secondary font-mono text-body-medium">RetroForge-Core + RAG</div>
               </div>
             </div>
           </div>
           
-          <div className="mt-6 border-t border-white/5 pt-4">
-            <div className="text-xs text-gray-400 flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <span>Status:</span>
-                <span className="text-green-400 font-bold bg-green-500/10 px-2 py-0.5 rounded">TREINADO E ATIVO</span>
+          <div className="mt-8 border-t border-outline-variant pt-4">
+            <div className="text-label-large text-on-surface-variant flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <span>Status</span>
+                <span className="text-green-500 font-medium bg-green-500/10 px-2.5 py-1 rounded-md text-label-small">ATIVO</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-purple-400" />
-                <span className="text-purple-400 font-bold text-[10px] tracking-widest uppercase bg-purple-500/10 px-2 py-0.5 rounded mt-1">Tier 1 Sync Online</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-secondary">
+                  <Users className="w-4 h-4" />
+                  <span>Sincronização</span>
+                </div>
+                <span className="text-secondary font-medium uppercase bg-secondary-container px-2.5 py-1 rounded-md text-label-small">Tier 1 Sync</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* Knowledge Base */}
-        <div className="col-span-2 bg-[#141414] border border-white/5 rounded-2xl p-6 flex flex-col">
+        <div className="col-span-2 bg-surface-container-low border border-outline-variant rounded-3xl p-6 flex flex-col shadow-elevation-1">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-white font-bold flex items-center gap-2">
-              <Database className="w-5 h-5 text-cyan-400" />
-              Base de Conhecimento Customizada
+            <h3 className="text-title-large text-on-surface flex items-center gap-2">
+              <Database className="w-6 h-6 text-primary" />
+              Base de Conhecimento
             </h3>
             <button 
               onClick={handleUpload}
-              className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white text-sm font-bold rounded-lg border border-white/10 flex items-center gap-2 transition-colors"
+              className="px-5 py-2.5 bg-secondary-container hover:bg-secondary-container/80 text-on-secondary-container text-label-large font-medium rounded-full flex items-center gap-2 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 focus:ring-offset-surface"
             >
-              <UploadCloud className="w-4 h-4" />
+              <UploadCloud className="w-5 h-5" />
               Upload Dados
             </button>
           </div>
 
-          <div className="flex-1 border border-white/5 rounded-xl overflow-hidden bg-black/40">
-            <div className="grid grid-cols-12 gap-4 p-3 border-b border-white/5 text-xs font-bold text-gray-500 uppercase tracking-wider bg-white/5">
+          <div className="flex-1 border border-outline-variant rounded-[24px] overflow-hidden bg-surface">
+            <div className="grid grid-cols-12 gap-4 p-4 border-b border-outline-variant text-label-small font-medium text-on-surface-variant uppercase tracking-wider bg-surface-container-high">
               <div className="col-span-6">Arquivo / Fonte</div>
               <div className="col-span-4">Tipo</div>
-              <div className="col-span-2">Tamanho</div>
+              <div className="col-span-2 text-right">Tamanho</div>
             </div>
             <div className="max-h-64 overflow-y-auto custom-scrollbar p-2 space-y-2">
               {knowledgeBase.map((item, i) => (
-                <div key={i} onClick={() => openDoc(item)} className="grid grid-cols-12 gap-4 p-3 rounded-lg hover:bg-white/5 transition-colors text-sm border border-transparent hover:border-white/5 cursor-pointer">
-                  <div className="col-span-6 flex items-center gap-3 text-gray-300">
-                    <Code className="w-4 h-4 text-gray-500" />
-                    <span className="truncate">{item.name}</span>
+                <div key={i} onClick={() => openDoc(item)} className="grid grid-cols-12 gap-4 p-3 rounded-xl hover:bg-surface-container-high transition-colors text-body-medium border border-transparent hover:border-outline-variant cursor-pointer group">
+                  <div className="col-span-6 flex items-center gap-3 text-on-surface">
+                    <Code className="w-5 h-5 text-on-surface-variant" />
+                    <span className="truncate font-medium">{item.name}</span>
                   </div>
                   <div className="col-span-4 flex items-center">
-                    <span className="text-xs bg-cyan-500/10 text-cyan-400 px-2 py-1 rounded">
+                    <span className="text-label-small bg-primary-container text-on-primary-container px-2.5 py-1 rounded-md font-medium">
                       {item.type}
                     </span>
                   </div>
-                  <div className="col-span-2 flex items-center justify-between text-gray-500 font-mono text-xs">
+                  <div className="col-span-2 flex items-center justify-end gap-2 text-on-surface-variant font-mono text-label-small">
                     <span>{item.size}</span>
                     {!item.isStatic && (
                        <button 
                          onClick={(e) => { e.stopPropagation(); setKnowledgeBase(prev => prev.filter((_, idx) => idx !== i)); }}
-                         className="p-1 hover:bg-red-500/20 text-gray-500 hover:text-red-400 rounded transition-colors"
+                         className="p-1.5 hover:bg-error-container text-on-surface-variant hover:text-error rounded-full opacity-0 group-hover:opacity-100 transition-all focus:outline-none focus:ring-2 focus:ring-error"
                        >
-                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
                        </button>
                     )}
                   </div>
                 </div>
               ))}
               {knowledgeBase.length === 0 && (
-                <div className="p-8 text-center text-gray-500 text-sm font-mono tracking-widest uppercase opacity-60">
-                  // NENHUMA FONTE DE TREINAMENTO ENCONTRADA NA CAMADA ATUAL. //
+                <div className="p-10 text-center text-on-surface-variant text-label-medium font-mono uppercase opacity-60">
+                  // NENHUMA FONTE DE TREINAMENTO ENCONTRADA. //
                 </div>
               )}
             </div>
@@ -437,30 +438,30 @@ def retroforge_auto_mod(hex_buffer, offset, user_intent):
       </div>
 
       {/* Fine-Tuning Action Area */}
-      <div className="bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] border border-cyan-500/20 rounded-2xl p-8 flex flex-col items-center justify-center text-center relative overflow-hidden">
+      <div className="bg-surface-container-high border border-primary/30 rounded-3xl p-10 flex flex-col items-center justify-center text-center relative overflow-hidden shadow-elevation-2">
         {/* Glow effect */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-cyan-500/20 blur-[100px] pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-primary/10 blur-[100px] pointer-events-none rounded-full" />
         
-        <BrainCircuit className="w-16 h-16 text-cyan-400 mb-6 relative z-10" />
-        <h2 className="text-2xl font-bold text-white mb-2 relative z-10">Processar Nova Base de Conhecimento</h2>
-        <p className="text-gray-400 max-w-lg mb-8 relative z-10">
+        <BrainCircuit className="w-16 h-16 text-primary mb-6 relative z-10" />
+        <h2 className="text-headline-medium font-medium text-on-surface mb-3 relative z-10">Processar Nova Base de Conhecimento</h2>
+        <p className="text-body-large text-on-surface-variant max-w-xl mb-8 relative z-10">
           A IA analisará todos os SDKs, manuais e códigos recém-enviados para criar um novo "Lora" ou Contexto Especializado (RAG) para o seu jogo.
         </p>
 
         {isTraining ? (
-          <div className="w-full max-w-md bg-black/60 border border-cyan-500/30 p-6 rounded-xl relative z-10">
-            <div className="flex justify-between text-sm mb-4">
-              <span className="text-cyan-400 font-mono">FINETUNING_IN_PROGRESS</span>
-              <span className="text-white font-mono">{trainingProgress.toFixed(0)}%</span>
+          <div className="w-full max-w-md bg-surface border border-primary/30 p-6 rounded-2xl relative z-10 shadow-elevation-1">
+            <div className="flex justify-between items-center mb-4 text-label-medium font-medium">
+              <span className="text-primary font-mono uppercase">FINETUNING_IN_PROGRESS</span>
+              <span className="text-on-surface font-mono">{trainingProgress.toFixed(0)}%</span>
             </div>
-            <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden">
+            <div className="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden">
                <motion.div 
-                 className="h-full bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.6)]"
+                 className="h-full bg-primary"
                  style={{ width: `${trainingProgress}%` }}
                />
             </div>
-            <p className="text-xs text-gray-500 mt-4 text-center mt-4 flex items-center justify-center gap-2">
-              <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse" />
+            <p className="text-label-medium text-on-surface-variant text-center mt-5 flex items-center justify-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary animate-pulse" />
               Treinando embeddings na arquitetura informada...
             </p>
           </div>
@@ -469,46 +470,46 @@ def retroforge_auto_mod(hex_buffer, offset, user_intent):
             <button 
               onClick={startTraining}
               disabled={knowledgeBase.length === 0}
-              className="px-8 py-4 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold uppercase tracking-widest rounded-xl shadow-[0_0_30px_rgba(6,182,212,0.3)] transition-all transform hover:scale-105 active:scale-95 flex items-center gap-3"
+              className="h-14 px-10 bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-on-primary font-bold text-label-large uppercase tracking-widest rounded-full shadow-elevation-2 transition-all transform hover:scale-105 active:scale-95 flex items-center gap-3 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-surface-container-high"
             >
-              <Cpu className="w-5 h-5" />
+              <Cpu className="w-6 h-6" />
               INICIAR TREINAMENTO
             </button>
-            {ragError && <p className="text-red-400 text-sm mt-2 font-mono">{ragError}</p>}
+            {ragError && <p className="text-error text-body-medium font-mono bg-error-container text-on-error-container px-4 py-2 rounded-md">{ragError}</p>}
             {trainingProgress === 100 && !ragError && (
-              <p className="text-green-400 text-sm mt-2 font-mono">✅ Treinamento concluído e RAG salvo no Cache Local.</p>
+              <p className="text-green-600 dark:text-green-400 text-body-medium font-mono font-medium">✅ Treinamento concluído e RAG salvo no Cache Local.</p>
             )}
           </div>
         )}
       </div>
 
-      <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex gap-4 text-sm text-red-200">
-        <AlertTriangle className="w-6 h-6 text-red-400 shrink-0" />
+      <div className="p-5 bg-error-container/30 border border-error-container rounded-2xl flex gap-4 text-on-surface">
+        <AlertTriangle className="w-6 h-6 text-error shrink-0" />
         <div>
-          <strong className="text-red-400 block mb-1">Aviso sobre Dados Customizados</strong>
-          A engine de fine-tuning roda em containers isolados. O código fonte enviado (C/C++) será usado estritamente como in-context learning para melhorar a qualidade dos pseudocódigos gerados pelo RetroForge. Seus dados não treinam o modelo base global do Gemini publicamente.
+          <strong className="text-error font-medium block mb-1">Aviso sobre Dados Customizados</strong>
+          <span className="text-body-medium opacity-90">A engine de fine-tuning roda em containers isolados. O código fonte enviado (C/C++) será usado estritamente como in-context learning para melhorar a qualidade dos pseudocódigos gerados pelo RetroForge. Seus dados não treinam o modelo base global do Gemini publicamente.</span>
         </div>
       </div>
 
       <AnimatePresence>
          {docModal && (
              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setDocModal(null)} className="absolute inset-0 bg-black/80 backdrop-blur-md" />
-                 <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-[#141414] border border-white/10 rounded-2xl w-full max-w-3xl max-h-[80vh] flex flex-col relative z-10 shadow-2xl">
-                     <div className="flex justify-between items-center p-4 border-b border-white/5 bg-white/5 rounded-t-2xl">
-                         <h3 className="text-white font-bold flex items-center gap-2 font-mono text-sm">
-                             {docModal.type === 'markdown' ? <FileText className="w-4 h-4 text-cyan-400"/> : <Code2 className="w-4 h-4 text-purple-400"/>} 
+                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setDocModal(null)} className="absolute inset-0 bg-scrim/80 backdrop-blur-md" />
+                 <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} className="bg-surface-container-high border border-outline-variant rounded-3xl w-full max-w-3xl max-h-[85vh] flex flex-col relative z-10 shadow-elevation-3">
+                     <div className="flex justify-between items-center p-5 border-b border-outline-variant bg-surface rounded-t-3xl">
+                         <h3 className="text-title-medium text-on-surface font-medium flex items-center gap-3 font-mono">
+                             {docModal.type === 'markdown' ? <FileText className="w-5 h-5 text-primary"/> : <Code2 className="w-5 h-5 text-secondary"/>} 
                              {docModal.title}
                          </h3>
-                         <button onClick={() => setDocModal(null)} className="text-gray-500 hover:text-white transition-colors"><X className="w-5 h-5"/></button>
+                         <button onClick={() => setDocModal(null)} className="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-variant rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary"><X className="w-5 h-5"/></button>
                      </div>
-                     <div className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-black/40">
+                     <div className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-surface-container">
                          {docModal.type === 'markdown' ? (
-                             <div className="prose prose-invert prose-p:text-sm prose-h2:text-lg prose-h2:text-cyan-400 prose-pre:bg-black/80 prose-pre:border prose-pre:border-white/5 max-w-none">
+                             <div className="prose prose-invert prose-p:text-body-medium prose-p:text-on-surface prose-h2:text-title-large prose-h2:text-primary prose-pre:bg-surface-container-highest prose-pre:border prose-pre:border-outline-variant max-w-none">
                                  <Markdown>{docModal.content}</Markdown>
                              </div>
                          ) : (
-                             <pre className="font-mono text-[11px] text-cyan-400/80 leading-relaxed whitespace-pre-wrap">{docModal.content}</pre>
+                             <pre className="font-mono text-label-medium text-primary/90 leading-relaxed whitespace-pre-wrap">{docModal.content}</pre>
                          )}
                      </div>
                  </motion.div>

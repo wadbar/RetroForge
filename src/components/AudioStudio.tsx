@@ -174,109 +174,108 @@ export default function AudioStudio() {
     <div className="max-w-6xl mx-auto flex flex-col h-full gap-6">
       <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
       
-      <div className="flex justify-between items-center bg-[#141414] p-6 rounded-2xl border border-white/5 shrink-0">
+      <div className="flex justify-between items-center bg-surface-container-high p-6 rounded-3xl border border-outline-variant shadow-elevation-1 shrink-0">
         <div className="flex gap-4 items-center">
-          <div className="p-3 bg-rose-500/20 text-rose-400 rounded-xl">
+          <div className="p-4 bg-tertiary-container text-on-tertiary-container rounded-2xl shadow-sm">
             <Music className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-white font-bold text-xl">Audio & SoundFont Studio</h2>
-            <p className="text-gray-500 text-sm">Visualização de Amostras de Áudio, Seq, e Sintetizador Dinâmico.</p>
+            <h2 className="text-display-small text-on-surface mb-1">Audio & SoundFont Studio</h2>
+            <p className="text-body-large text-on-surface-variant">Visualização de Amostras de Áudio, Seq, e Sintetizador Dinâmico.</p>
           </div>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-4">
            <button 
              onClick={() => fileInputRef.current?.click()}
-             className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-gray-300 font-bold flex items-center gap-2 hover:bg-white/10 transition-all"
+             className="px-6 py-3 bg-surface-container border border-outline-variant rounded-full text-on-surface font-medium flex items-center gap-2 hover:bg-surface-variant transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
            >
-             <Upload className="w-4 h-4" /> LOAD BINARY
+             <Upload className="w-5 h-5" /> LOAD BINARY
            </button>
            <button 
              onClick={runAiExtraction}
              disabled={isAiLoading || !fileData}
-             className="px-4 py-2 bg-rose-500/10 border border-rose-500/30 text-rose-400 font-bold rounded-xl flex items-center gap-2 hover:bg-rose-500 hover:text-white transition-all shadow-[0_0_15px_rgba(244,63,94,0.15)] disabled:opacity-50"
+             className="px-6 py-3 bg-tertiary hover:bg-tertiary/90 text-on-tertiary font-bold rounded-full flex items-center gap-2 transition-all shadow-elevation-1 focus:outline-none focus:ring-2 focus:ring-tertiary focus:ring-offset-2 focus:ring-offset-surface disabled:opacity-50"
            >
-             {isAiLoading ? <Loader2 className="w-4 h-4 animate-spin"/> : <Wand2 className="w-4 h-4" />} AI EXTRACT SAMPLES
+             {isAiLoading ? <Loader2 className="w-5 h-5 animate-spin"/> : <Wand2 className="w-5 h-5" />} AI EXTRACT SAMPLES
            </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1 min-h-0">
-        <div className="lg:col-span-1 space-y-4 overflow-y-auto custom-scrollbar pr-2">
-            <div className="bg-[#141414] border border-white/5 rounded-2xl p-6 space-y-6">
-                <h3 className="text-white font-bold text-sm tracking-widest uppercase flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-gray-400" /> Playback
+        <div className="lg:col-span-1 border border-outline-variant rounded-3xl bg-surface-container-low p-6 space-y-6 overflow-y-auto custom-scrollbar">
+            <div className="space-y-6">
+                <h3 className="text-title-medium font-medium text-on-surface tracking-widest uppercase flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-on-surface-variant" /> Playback
                 </h3>
                 
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-3">
                     <button 
                        onClick={isPlaying ? stopAudio : playRawAudio}
                        disabled={!fileData}
-                       className={`flex-1 flex justify-center items-center gap-2 px-4 py-3 rounded-lg font-bold transition-all ${isPlaying ? 'bg-red-500/20 text-red-400 border border-red-500/50' : 'bg-rose-500 text-white hover:bg-rose-600 disabled:opacity-50 disabled:bg-gray-600'}`}
+                       className={`flex-1 flex justify-center items-center gap-2 px-4 py-4 rounded-xl font-bold transition-all shadow-elevation-1 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${isPlaying ? 'bg-error-container text-on-error-container border border-error/50' : 'bg-primary text-on-primary hover:bg-primary/90 disabled:opacity-50'}`}
                     >
-                       {isPlaying ? <><Square className="w-4 h-4 fill-current"/> STOP</> : <><Play className="w-4 h-4 fill-current"/> PLAY RAW</>}
+                       {isPlaying ? <><Square className="w-5 h-5 fill-current"/> STOP</> : <><Play className="w-5 h-5 fill-current"/> PLAY RAW</>}
                     </button>
                     <button 
                        onClick={exportWAV}
                        disabled={!fileData}
-                       className={`px-4 py-3 rounded-lg font-bold border border-white/10 text-gray-300 hover:bg-white/10 transition-all disabled:opacity-50`}
+                       className={`w-full flex justify-center px-4 py-4 rounded-xl font-medium border border-outline text-on-surface hover:bg-surface-variant transition-all disabled:opacity-50 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary`}
                        title="Exportar WAV"
                     >
-                       <Download className="w-4 h-4"/>
+                       <Download className="w-5 h-5 mr-2"/> EXPORT WAV
                     </button>
                 </div>
 
-                <div className="space-y-2 pt-4 border-t border-white/10">
-                    <h4 className="text-xs font-bold text-gray-500 uppercase">Amostras Sugeridas pela IA</h4>
+                <div className="space-y-3 pt-6 border-t border-outline-variant">
+                    <h4 className="text-label-medium font-bold text-on-surface-variant uppercase">Amostras Sugeridas pela IA</h4>
                     {fileData ? (
                         <div className="space-y-2">
                            {aiAnalysis.length > 0 ? (
                                aiAnalysis.map((line, idx) => (
-                                 <div key={idx} className="flex justify-between items-center text-xs p-2 bg-white/5 rounded hover:bg-white/10 cursor-pointer">
-                                    <span className="text-rose-400 font-mono">{line}</span>
-                                    <Sparkles className="w-3 h-3 text-rose-500"/>
+                                 <div key={idx} className="flex justify-between items-center text-label-large p-3 bg-surface-container-high rounded-lg hover:bg-surface-variant cursor-pointer transition-colors border border-outline-variant">
+                                    <span className="text-tertiary font-mono">{line}</span>
+                                    <Sparkles className="w-4 h-4 text-tertiary"/>
                                  </div>
                                ))
                            ) : (
-                               <p className="text-xs text-gray-500">Clique em AI Extract para mapear arquivos de áudio.</p>
+                               <p className="text-body-medium text-on-surface-variant">Clique em AI Extract para mapear arquivos de áudio.</p>
                            )}
                         </div>
                     ) : (
-                        <p className="text-xs text-gray-600">Nenhum banco de áudio carregado.</p>
+                        <p className="text-body-medium text-on-surface-variant opacity-70">Nenhum banco de áudio carregado.</p>
                     )}
                 </div>
             </div>
         </div>
 
-        <div className="lg:col-span-3 bg-[#141414] border border-white/5 rounded-2xl flex flex-col p-8 gap-8">
-            <h3 className="text-white font-bold flex items-center gap-2"><Volume2 className="w-5 h-5 text-rose-400"/> Analisador de Espectro (Raw PCM)</h3>
+        <div className="lg:col-span-3 bg-surface-container border border-outline-variant rounded-3xl flex flex-col p-8 gap-8 shadow-elevation-1">
+            <h3 className="text-title-large text-on-surface font-medium flex items-center gap-3"><Volume2 className="w-6 h-6 text-tertiary"/> Analisador de Espectro (Raw PCM)</h3>
             
-            <div className="flex-1 flex items-end gap-1 bg-black/50 border border-white/5 p-4 rounded-xl">
+            <div className="flex-1 flex items-end gap-1 bg-surface-container-highest border border-outline-variant p-6 rounded-2xl shadow-inner">
                {analyzerData.map((val, i) => (
                    <div 
                       key={i} 
-                      className="flex-1 bg-gradient-to-t from-rose-600 to-rose-400 rounded-t-sm transition-all duration-75"
-                      style={{ height: `${val ? (val / 255) * 100 : 2}%` }}
+                      className="flex-1 bg-tertiary rounded-t-sm transition-all duration-75"
+                      style={{ height: `${val ? (val / 255) * 100 : 2}%`, opacity: val ? (val / 255) : 0.2 }}
                    />
                ))}
             </div>
 
-            <div className="h-32 bg-black/50 border border-white/5 p-4 rounded-xl flex items-center justify-center overflow-hidden relative">
-               <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'linear-gradient(90deg, transparent 50%, rgba(255,255,255,.05) 50%)', backgroundSize: '20px 100%' }}></div>
-               <p className="text-gray-500 font-mono text-xs z-10 flex items-center gap-2">
-                   <Activity className="w-4 h-4"/> 
+            <div className="h-32 bg-surface-container-highest border border-outline-variant p-4 rounded-2xl flex items-center justify-center overflow-hidden relative shadow-inner">
+               <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'linear-gradient(90deg, transparent 50%, var(--color-on-surface) 50%)', backgroundSize: '20px 100%' }}></div>
+               <p className="text-on-surface-variant font-mono text-label-large z-10 flex items-center gap-3">
+                   <Activity className="w-5 h-5"/> 
                    {fileData ? "Track 1: PCM Audio Data Loaded" : "Track 1: No Data"}
                </p>
             </div>
         </div>
       </div>
       {toastMsg && (
-        <div className="fixed bottom-6 right-6 p-4 rounded-xl shadow-2xl flex items-center gap-3 z-50 bg-rose-500/20 text-rose-100 border border-rose-500/50 animate-in fade-in slide-in-from-bottom-5">
-           <Wand2 className="w-5 h-5 text-rose-400" />
-           <p className="text-sm font-medium">{toastMsg}</p>
+        <div className="fixed bottom-8 right-8 p-6 rounded-2xl shadow-elevation-3 flex items-center gap-4 z-50 bg-tertiary-container text-on-tertiary-container border border-tertiary/20 animate-in fade-in slide-in-from-bottom-5">
+           <Wand2 className="w-6 h-6 text-tertiary" />
+           <p className="text-title-small font-medium">{toastMsg}</p>
         </div>
       )}
     </div>
   );
 }
-

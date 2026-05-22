@@ -86,29 +86,30 @@ export default function CommunityHub() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-20 relative">
-      <div className="flex justify-between items-center bg-[#141414] p-8 rounded-2xl border border-white/5 shadow-2xl relative overflow-hidden">
+      <div className="flex justify-between items-center bg-surface-container border border-outline-variant rounded-3xl p-8 shadow-elevation-2 relative overflow-hidden">
         <div className="absolute top-0 right-0 p-4 opacity-5">
            <Github className="w-32 h-32" />
         </div>
         <div className="relative z-10">
-          <h1 className="text-3xl font-bold text-white mb-2">Comunidade de <span className="text-cyan-400">Recompilação</span></h1>
-          <p className="text-gray-500 max-w-xl">Acompanhe projetos reais de engenharia reversa e ports nativos diretamente do ecossistema GitHub.</p>
+          <h1 className="text-display-small font-medium text-on-surface mb-3">Comunidade de <span className="text-primary">Recompilação</span></h1>
+          <p className="text-body-large text-on-surface-variant max-w-2xl">Acompanhe projetos reais de engenharia reversa e ports nativos diretamente do ecossistema GitHub.</p>
         </div>
         <button 
           onClick={() => fetchRepos()}
-          className="p-4 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all group"
+          className="p-4 bg-surface-container-high border border-outline-variant shadow-elevation-1 rounded-2xl hover:bg-surface-variant text-on-surface transition-all group focus:outline-none focus:ring-2 focus:ring-primary"
+          aria-label="Atualizar Cache"
         >
-          <RefreshCw className={`w-5 h-5 text-cyan-400 ${isLoading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
+          <RefreshCw className={`w-6 h-6 text-primary ${isLoading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
         </button>
       </div>
 
       <div className="flex gap-4">
         <div className="flex-1 relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+          <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-6 h-6 text-on-surface-variant" />
           <input 
             type="text" 
             placeholder="Pesquisar por tecnologias (ex: ps2, mips, recomp...)"
-            className="w-full bg-[#141414] border border-white/5 rounded-xl py-4 pl-12 pr-4 text-white placeholder-gray-600 outline-none focus:border-cyan-500/50 transition-all font-medium"
+            className="w-full bg-surface-container-highest border border-outline-variant rounded-full py-5 pl-16 pr-6 text-body-large text-on-surface placeholder-on-surface-variant outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 shadow-sm transition-all font-medium"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && fetchRepos()}
@@ -119,7 +120,7 @@ export default function CommunityHub() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {isLoading ? (
           Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-[200px] bg-[#141414] border border-white/5 rounded-2xl animate-pulse" />
+            <div key={i} className="h-[220px] bg-surface-container-low border border-outline-variant rounded-3xl animate-pulse shadow-sm" />
           ))
         ) : (
           repos.map((repo) => (
@@ -127,54 +128,54 @@ export default function CommunityHub() {
                initial={{ opacity: 0, scale: 0.95 }}
                animate={{ opacity: 1, scale: 1 }}
                key={repo.id}
-               className="bg-[#141414] border border-white/5 rounded-2xl p-6 group hover:border-cyan-500/30 transition-all hover:bg-white/[0.02] flex flex-col justify-between"
+               className="bg-surface border border-outline-variant rounded-3xl p-6 group hover:border-outline hover:shadow-elevation-2 transition-all flex flex-col justify-between"
             >
               <div>
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="p-2 bg-black/40 rounded-lg group-hover:bg-cyan-500/20 transition-colors">
-                      <Code2 className="w-5 h-5 text-cyan-400" />
+                  <div className="flex justify-between items-start mb-5">
+                    <div className="p-3 bg-secondary-container rounded-2xl group-hover:bg-primary-container transition-colors shadow-sm">
+                      <Code2 className="w-6 h-6 text-on-secondary-container group-hover:text-on-primary-container transition-colors" />
                     </div>
-                    <div className="flex gap-3 text-gray-500">
-                      <div className="flex items-center gap-1 text-xs bg-white/5 px-2 py-1 rounded">
-                        <Star className="w-3 h-3 text-yellow-500" />
+                    <div className="flex gap-2 text-on-surface-variant">
+                      <div className="flex items-center gap-1.5 text-label-medium bg-surface-container-high border border-outline-variant px-2.5 py-1.5 rounded-lg font-medium shadow-sm">
+                        <Star className="w-4 h-4 text-primary" />
                         {repo.stargazers_count > 1000 ? (repo.stargazers_count / 1000).toFixed(1) + 'k' : repo.stargazers_count}
                       </div>
-                      <div className="flex items-center gap-1 text-xs bg-white/5 px-2 py-1 rounded">
-                        <GitFork className="w-3 h-3" />
+                      <div className="flex items-center gap-1.5 text-label-medium bg-surface-container-high border border-outline-variant px-2.5 py-1.5 rounded-lg font-medium shadow-sm">
+                        <GitFork className="w-4 h-4 text-secondary" />
                         {repo.forks_count}
                       </div>
                     </div>
                   </div>
 
-                  <h3 className="text-white font-bold text-lg mb-2 truncate group-hover:text-cyan-400 transition-colors" title={repo.full_name}>
+                  <h3 className="text-title-large text-on-surface font-medium mb-2 truncate group-hover:text-primary transition-colors" title={repo.full_name}>
                     {repo.full_name.split('/')[1]}
                   </h3>
-                  <p className="text-gray-500 text-xs mb-6 line-clamp-2 min-h-[32px]" title={repo.description}>
+                  <p className="text-body-medium text-on-surface-variant mb-6 line-clamp-2 min-h-[40px]" title={repo.description}>
                     {repo.description || 'Nenhuma descrição fornecida.'}
                   </p>
               </div>
 
-              <div className="flex flex-col gap-3 pt-4 border-t border-white/5">
+              <div className="flex flex-col gap-4 pt-5 border-t border-outline-variant">
                 <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono text-gray-600 uppercase tracking-widest">{repo.language || 'Binary'}</span>
+                    <span className="text-label-small font-mono text-on-surface-variant uppercase tracking-widest">{repo.language || 'Binary'}</span>
                     <a 
                       href={repo.html_url} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-xs font-bold text-gray-400 hover:text-cyan-400 transition-colors"
+                      className="flex items-center gap-1.5 text-label-medium font-bold text-secondary hover:text-primary transition-colors"
                     >
-                      GITHUB <ExternalLink className="w-3 h-3" />
+                      GITHUB <ExternalLink className="w-4 h-4" />
                     </a>
                 </div>
                 <button 
                    onClick={() => handleImport(repo)}
                    disabled={importingId === repo.id}
-                   className="w-full py-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 disabled:opacity-50 border border-cyan-500/20 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-colors"
+                   className="w-full py-3 bg-primary hover:bg-primary/90 disabled:opacity-50 text-on-primary rounded-xl text-label-large font-bold flex items-center justify-center gap-2 transition-colors shadow-elevation-1 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-surface"
                 >
                     {importingId === repo.id ? (
-                        <><RefreshCw className="w-3 h-3 animate-spin"/> IMPORTANDO...</>
+                        <><RefreshCw className="w-4 h-4 animate-spin"/> IMPORTANDO...</>
                     ) : (
-                        <><DownloadCloud className="w-3 h-3"/> IMPORTAR PARA O RETROFORGE</>
+                        <><DownloadCloud className="w-4 h-4"/> IMPORTAR PARA O WORKSPACE</>
                     )}
                 </button>
               </div>
@@ -184,10 +185,10 @@ export default function CommunityHub() {
       </div>
 
       {!isLoading && repos.length === 0 && (
-        <div className="text-center py-20 bg-[#141414] rounded-3xl border border-white/5">
-           <Github className="w-16 h-16 text-gray-800 mx-auto mb-4" />
-           <h3 className="text-white font-bold text-xl">Nenhum repositório encontrado</h3>
-           <p className="text-gray-500">Tente buscar por termos diferentes.</p>
+        <div className="text-center py-20 bg-surface-container rounded-3xl border border-outline-variant shadow-elevation-1">
+           <Github className="w-20 h-20 text-on-surface-variant/50 mx-auto mb-6" />
+           <h3 className="text-title-large text-on-surface mb-2 font-medium">Nenhum repositório encontrado</h3>
+           <p className="text-body-large text-on-surface-variant">Tente buscar por termos diferentes ou expanda o escopo.</p>
         </div>
       )}
 
@@ -198,10 +199,10 @@ export default function CommunityHub() {
             initial={{ opacity: 0, y: 50, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9, y: 50 }}
-            className={`fixed bottom-6 right-6 p-4 rounded-xl shadow-2xl flex items-center gap-3 z-50 ${toastMsg.type === 'error' ? 'bg-red-500/20 text-red-100 border border-red-500/50' : 'bg-cyan-500/20 text-cyan-100 border border-cyan-500/50'}`}
+            className={`fixed bottom-6 right-6 p-4 rounded-2xl shadow-elevation-3 flex items-center gap-3 z-50 ${toastMsg.type === 'error' ? 'bg-error-container text-on-error-container border border-error/20' : 'bg-primary-container text-on-primary-container border border-primary/20'}`}
           >
-            {toastMsg.type === 'error' ? <X className="w-5 h-5 text-red-500" /> : <Check className="w-5 h-5 text-cyan-400" />}
-            <p className="text-sm font-medium">{toastMsg.text}</p>
+            {toastMsg.type === 'error' ? <X className="w-6 h-6 text-error" /> : <Check className="w-6 h-6 text-primary" />}
+            <p className="text-title-small font-medium">{toastMsg.text}</p>
           </motion.div>
         )}
       </AnimatePresence>

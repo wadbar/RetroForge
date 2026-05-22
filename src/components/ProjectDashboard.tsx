@@ -1,11 +1,14 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { Play, Clock, ChevronRight, Activity, Cpu, Monitor, Download, Plus, Upload, Trash2, X, Loader2, Github, RefreshCw, Binary, Zap, FileText, Code2, BrainCircuit, Network, Bug, SearchCode, ShieldAlert } from 'lucide-react';
+import { Play, Clock, ChevronRight, Activity, Cpu, Monitor, Download, Plus, Upload, Trash2, X, Loader2, Github, RefreshCw, Binary, Zap, FileText, Code2, BrainCircuit, Network, Bug, SearchCode, ShieldAlert, Cloud, CloudOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 import { logger } from '../services/loggerService';
 import { projectService, ProjectMetadata } from '../services/projectService';
 import { deepAnalyzeWithAI } from '../services/aiDecompilerService';
 import { ArchType } from '../core/types';
+import { eventBus } from '../services/eventBus';
+import { auth, db } from '../services/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 interface Project extends ProjectMetadata {
   progress: number;
@@ -16,6 +19,39 @@ interface Project extends ProjectMetadata {
   health: number; // 0-100
   analysisStatus: 'pending' | 'scanning' | 'ready' | 'error';
 }
+
+const CloudStatusIndicator = () => {
+  const [isCloudEnabled, setIsCloudEnabled] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  useEffect(() => {
+    const unsubAuth = auth.onAuthStateChanged((user) => {
+      setIsCloudEnabled(!!user);
+    });
+
+    const handleSyncStart = () => setIsSyncing(true);
+    const handleSyncEnd = () => setIsSyncing(false);
+
+    eventBus.on('CLOUD_SYNC_START', handleSyncStart);
+    eventBus.on('CLOUD_SYNC_END', handleSyncEnd);
+
+    return () => {
+      unsubAuth();
+      eventBus.off('CLOUD_SYNC_START', handleSyncStart);
+      eventBus.off('CLOUD_SYNC_END', handleSyncEnd);
+    }
+  }, []);
+
+  return isCloudEnabled ? (
+    <span className={`flex items-center gap-1.5 px-3 py-1 bg-primary-container text-on-primary-container text-label-small font-bold rounded-full border border-primary/20 ${isSyncing ? 'cloud-sync-pulse' : ''}`} title="Sincronização em Nuvem (Firestore) Ativa">
+      <Cloud className="w-4 h-4" /> {isSyncing ? 'Sincronizando...' : 'Cloud Sync'}
+    </span>
+  ) : (
+    <span className="flex items-center gap-1.5 px-3 py-1 bg-surface-variant text-on-surface-variant text-label-small font-bold rounded-full border border-outline-variant" title="Armazenamento Local (Offline)">
+      <CloudOff className="w-4 h-4" /> Offline
+    </span>
+  );
+};
 
 export default function ProjectDashboard({ activeProjectId, onSelectProject, onStartModding, settings }: { activeProjectId: string | null, onSelectProject: (id: string) => void, onStartModding?: () => void, settings?: any }) {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -41,32 +77,169 @@ export default function ProjectDashboard({ activeProjectId, onSelectProject, onS
 
   const [docModal, setDocModal] = useState<{type: 'markdown' | 'code' | 'telemetry', title: string, content: any} | null>(null);
 
+  // Priority-Queue: Buffer local modifications to IndexedDB before trying Firestore
+  const [syncQueue, setSyncQueue] = useState<{projectId: string, updates: Partial<ProjectMetadata>, priority: number}[]>([]);
+
+  useEffect(() => {
+    if (syncQueue.length === 0 || agentStatus !== 'idle') return;
+    
+    let isMounted = true;
+    const processQueue = async () => {
+      const item = syncQueue[0];
+      try {
+        await projectService.updateProjectData(item.projectId, undefined, item.updates);
+        if (isMounted) {
+          setSyncQueue(prev => prev.slice(1));
+        }
+      } catch (error) {
+        logger.error(`[PriorityQueue] Sync pending for ${item.projectId} due to offline status:`, error);
+      }
+    };
+    
+    const timeoutId = setTimeout(processQueue, 2000);
+    return () => clearTimeout(timeoutId);
+  }, [syncQueue, agentStatus]);
+
   useEffect(() => {
     let isMounted = true;
     const loadProjects = async () => {
       try {
         const stored = await projectService.getProjects();
         if (!isMounted) return;
+
+        let cloudProjects: Project[] = [];
+        if (auth.currentUser) {
+          try {
+            const q = query(collection(db, 'projects'), where('ownerId', '==', auth.currentUser.uid));
+            const querySnapshot = await getDocs(q);
+            cloudProjects = querySnapshot.docs.map(doc => {
+              const data = doc.data();
+              return {
+                id: doc.id,
+                name: data.name || 'Cloud Project',
+                platform: data.platform || 'Desconhecido',
+                fileSize: data.fileSize || 0,
+                lastModified: data.lastModified || Date.now(),
+                size: data.fileSize || 0,
+                progress: data.progress || 0,
+                status: data.status || 'Pendente',
+                lastSync: 'Sincronizado',
+                efficiency: data.efficiency || 'N/A',
+                tasks: data.tasks || [],
+                health: data.health !== undefined ? data.health : 100,
+                analysisStatus: data.analysisStatus || 'ready',
+                ownerId: data.ownerId,
+                createdAt: data.createdAt || Date.now(),
+                updatedAt: data.updatedAt || Date.now(),
+                version: data.version || '1.0'
+              } as unknown as Project;
+            });
+          } catch (e) {
+            console.error("Failed to load cloud projects", e);
+          }
+        }
+
         const mapped: Project[] = stored.map(p => ({
           ...p,
           size: p.fileSize,
           progress: p.progress || 0,
           status: p.status || 'Pendente',
-          lastSync: p.lastSync || 'Local',
+          lastSync: 'Aguardando Cloud',
           efficiency: p.efficiency || 'N/A',
           tasks: p.tasks || [],
           health: p.health !== undefined ? p.health : 100,
           analysisStatus: p.analysisStatus || 'ready'
         }));
-        setProjects(mapped);
+
+        const combined = [...cloudProjects];
+        mapped.forEach(localP => {
+          if (!combined.find(c => c.id === localP.id)) {
+            combined.push(localP);
+          }
+        });
+
+        if (isMounted) {
+          setProjects(combined);
+        }
       } catch (error: any) {
         if (!isMounted) return;
         logger.error(`[ProjectDashboard] Failed to load projects: ${error?.message || error}`);
       }
     };
     loadProjects();
+
+    const handleProjectsReloaded = (newProjects: ProjectMetadata[]) => {
+      if (!isMounted) return;
+      setProjects(newProjects.map(p => ({
+        ...p,
+        size: p.fileSize,
+        progress: p.progress || 0,
+        status: p.status || 'Pendente',
+        lastSync: p.lastSync || 'Local',
+        efficiency: p.efficiency || 'N/A',
+        tasks: p.tasks || [],
+        health: p.health !== undefined ? p.health : 100,
+        analysisStatus: p.analysisStatus || 'ready'
+      })));
+    };
+
+    const handleCloudProjects = async (cloudProjects: any[]) => {
+      if (!isMounted) return;
+      const stored = await projectService.getProjects();
+      
+      const mapped: Project[] = stored.map(p => ({
+        ...p,
+        size: p.fileSize,
+        progress: p.progress || 0,
+        status: p.status || 'Pendente',
+        lastSync: 'Aguardando Cloud',
+        efficiency: p.efficiency || 'N/A',
+        tasks: p.tasks || [],
+        health: p.health !== undefined ? p.health : 100,
+        analysisStatus: p.analysisStatus || 'ready'
+      }));
+
+      const combined = cloudProjects.map(data => ({
+        id: data.id,
+        name: data.name || 'Cloud Project',
+        platform: data.platform || 'Desconhecido',
+        fileSize: data.fileSize || 0,
+        lastModified: data.lastModified || Date.now(),
+        size: data.fileSize || 0,
+        progress: data.progress || 0,
+        status: data.status || 'Pendente',
+        lastSync: 'Sincronizado',
+        efficiency: data.efficiency || 'N/A',
+        tasks: data.tasks || [],
+        health: data.health !== undefined ? data.health : 100,
+        analysisStatus: data.analysisStatus || 'ready',
+        ownerId: data.ownerId,
+        createdAt: data.createdAt || Date.now(),
+        updatedAt: data.updatedAt || Date.now(),
+        version: data.version || '1.0'
+      } as unknown as Project));
+
+      mapped.forEach(localP => {
+        if (!combined.find(c => c.id === localP.id)) combined.push(localP);
+      });
+      
+      setProjects(combined);
+    };
+
+    const unsubAuth = auth.onAuthStateChanged((user) => {
+      if (isMounted) {
+        loadProjects();
+      }
+    });
+
+    eventBus.on('PROJECTS_RELOADED', handleProjectsReloaded);
+    eventBus.on('CLOUD_PROJECTS_UPDATED', handleCloudProjects);
+
     return () => {
       isMounted = false;
+      eventBus.off('PROJECTS_RELOADED', handleProjectsReloaded);
+      eventBus.off('CLOUD_PROJECTS_UPDATED', handleCloudProjects);
+      unsubAuth();
     };
   }, []);
 
@@ -259,7 +432,12 @@ export default function ProjectDashboard({ activeProjectId, onSelectProject, onS
                  </span>
                  {project.analysisStatus === 'ready' ? <Zap className="w-3 h-3 text-green-600 dark:text-green-400" /> : <Loader2 className="w-3 h-3 text-primary animate-spin" />}
               </div>
-              <span className="text-label-small font-mono text-on-surface-variant bg-surface-variant px-2 py-0.5 rounded-md">{project.platform}</span>
+              <div className="flex flex-col items-end gap-1">
+                <span className="text-label-small font-mono text-on-surface-variant bg-surface-variant px-2 py-0.5 rounded-md">{project.platform}</span>
+                <span className="text-label-small font-mono text-on-surface-variant px-2 py-0.5 rounded-md border border-outline-variant mt-1" title="Status de Sincronização">
+                  {project.lastSync}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -285,14 +463,43 @@ export default function ProjectDashboard({ activeProjectId, onSelectProject, onS
     </div>
   ), [projects, activeProjectId, onSelectProject]);
 
+  const triggerExport = () => {
+    const exportData = {
+      timestamp: new Date().toISOString(),
+      projects: projects,
+      agentLogs: agentLogs,
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `retroforge-export-${new Date().getTime()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('success', 'Relatório de Projetos exportado com sucesso.');
+  };
+
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-20">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-8">
         <div>
-          <h1 className="text-display-small text-on-background tracking-normal mb-1">Hub de Projetos</h1>
+          <div className="flex items-center gap-4 mb-1">
+            <h1 className="text-display-small text-on-background tracking-normal">Hub de Projetos</h1>
+            <CloudStatusIndicator />
+          </div>
           <p className="text-body-large text-on-surface-variant">Gerencie seus processos de extração e recompilação</p>
         </div>
         <div className="flex gap-4">
+          <button
+            onClick={triggerExport}
+            className="h-12 px-6 bg-surface border border-outline rounded-full font-medium shadow-sm hover:bg-surface-variant transition-all flex items-center gap-2 tracking-wide text-primary"
+            title="Exportar dados do projeto e logs para JSON"
+          >
+            <Download className="w-5 h-5" />
+            <span className="hidden md:inline">Exportar JSON</span>
+          </button>
           <input type="file" className="hidden" ref={agentInputRef} onChange={(e) => { if (e.target.files?.[0]) startAutomatedAgent(e.target.files[0]); }} />
           <button 
             onClick={() => agentInputRef.current?.click()} 

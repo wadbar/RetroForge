@@ -1,0 +1,98 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Global Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isVerified() {
+      // Allow during development but enforce if possible
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // 3. Validation Blueprints
+    function isValidProject(data) {
+      return data.keys().hasAll(['name', 'platform', 'status', 'health', 'analysisStatus', 'ownerId', 'createdAt', 'updatedAt']) &&
+             data.keys().size() == 8 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.platform is string && data.platform.size() > 0 && data.platform.size() <= 50 &&
+             data.status is string && data.status.size() > 0 && data.status.size() <= 50 &&
+             data.analysisStatus is string && data.analysisStatus.size() > 0 && data.analysisStatus.size() <= 50 &&
+             data.health is number && data.health >= 0 && data.health <= 100 &&
+             data.ownerId == request.auth.uid &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['email', 'createdAt']) &&
+             (data.keys().size() == 2 || (data.keys().size() == 3 && data.keys().hasAny(['displayName']))) &&
+             data.email is string && data.email.size() > 0 && data.email.size() <= 100 &&
+             (data.keys().hasAny(['displayName']) ? (data.displayName is string && data.displayName.size() <= 50) : true) &&
+             data.createdAt is timestamp;
+    }
+
+    // projects collection
+    match /projects/{projectId} {
+      // Path Variable Hardening
+      allow read: if isSignedIn() && isValidId(projectId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      
+      allow create: if isSignedIn() &&
+                    isValidId(projectId) &&
+                    isValidProject(incoming()) &&
+                    incoming().createdAt == request.time &&
+                    incoming().updatedAt == request.time;
+                    
+      allow update: if isSignedIn() &&
+                    isValidId(projectId) &&
+                    existing().ownerId == request.auth.uid &&
+                    incoming().updatedAt == request.time &&
+                    incoming().createdAt == existing().createdAt &&
+                    incoming().ownerId == existing().ownerId &&
+                    (
+                      // Action Full Update
+                      incoming().diff(existing()).affectedKeys().hasOnly(['name', 'platform', 'status', 'health', 'analysisStatus', 'updatedAt'])
+                    );
+                    
+      allow delete: if isSignedIn() && isValidId(projectId) && existing().ownerId == request.auth.uid;
+    }
+
+    // users collection
+    match /users/{userId} {
+      // Only the user can read/write their own profile
+      allow get: if isSignedIn() && isValidId(userId) && userId == request.auth.uid;
+      
+      allow create: if isSignedIn() && 
+                    isValidId(userId) &&
+                    userId == request.auth.uid &&
+                    isValidUserProfile(incoming()) &&
+                    incoming().createdAt == request.time;
+                    
+      allow update: if isSignedIn() &&
+                    isValidId(userId) &&
+                    userId == request.auth.uid &&
+                    incoming().createdAt == existing().createdAt &&
+                    incoming().email == existing().email &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['displayName']);
+    }
+  }
+}

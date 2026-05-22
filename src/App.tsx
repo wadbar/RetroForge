@@ -21,7 +21,8 @@ import {
   Activity,
   Menu,
   Moon,
-  Sun
+  Sun,
+  Search
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
@@ -38,6 +39,7 @@ const GraphicsStudio = React.lazy(() => import('./components/GraphicsStudio'));
 const GeometryStudio = React.lazy(() => import('./components/GeometryStudio'));
 const AudioStudio = React.lazy(() => import('./components/AudioStudio'));
 
+import { SearchModal } from './components/ui/SearchModal';
 import { Container, SERVICES } from './core/di/Container';
 import { logger } from './services/loggerService';
 import { monitor } from './services/monitorService';
@@ -47,6 +49,9 @@ import { eventLogger } from './services/eventLogger';
 import { configService } from './services/configService';
 import './services/selfHealingService';
 import { projectService } from './services/projectService';
+import { auth, signInWithGoogle, logoutAndClearSession, db } from './services/firebase';
+import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { startStorageAudit } from './utils/storage';
 
 // Initialize DI Container
 Container.register(SERVICES.LOGGER, logger);
@@ -66,6 +71,7 @@ export default function App() {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const shouldReduceMotion = useReducedMotion();
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   // Apply theme to document element
   useEffect(() => {
@@ -102,6 +108,32 @@ export default function App() {
 
   const [sysStats, setSysStats] = useState({ totalMem: 'N/A', usedMem: 'N/A', cpuLoad: 'N/A' });
   const [aiStatus, setAiStatus] = useState({ local: 'Online', cloud: 'Connected' });
+  const [user, setUser] = useState<any>(null);
+  const [projectLimit, setProjectLimit] = useState(20);
+
+  useEffect(() => {
+    let unsubscribeSnapshot: any = null;
+    const unsubscribe = auth.onAuthStateChanged((u) => {
+      setUser(u);
+    });
+    
+    if (user) {
+      const q = query(collection(db, 'projects'), where('ownerId', '==', user.uid), orderBy('updatedAt', 'desc'), limit(projectLimit));
+      unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
+        const cloudProjects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        eventBus.emit('CLOUD_PROJECTS_UPDATED', cloudProjects);
+      });
+    }
+
+    const handleLoadMore = () => setProjectLimit(prev => prev + 20);
+    eventBus.on('LOAD_MORE_PROJECTS', handleLoadMore);
+
+    return () => {
+      unsubscribe();
+      if (unsubscribeSnapshot) unsubscribeSnapshot();
+      eventBus.off('LOAD_MORE_PROJECTS', handleLoadMore);
+    };
+  }, [user, projectLimit]);
 
   useEffect(() => {
     const saved = localStorage.getItem('RF_SETTINGS');
@@ -141,6 +173,7 @@ export default function App() {
     };
     fetchStats();
     const interval = setInterval(fetchStats, 5000);
+    startStorageAudit();
     return () => {
       isMounted = false;
       clearInterval(interval);
@@ -257,15 +290,46 @@ export default function App() {
           
           <div className="flex items-center gap-2">
             <button 
+              onClick={() => setIsSearchOpen(true)}
+              className="w-12 h-12 flex items-center justify-center rounded-full hover:bg-on-surface/5 text-on-surface-variant transition-colors"
+              aria-label="Search"
+            >
+              <Search className="w-5 h-5 flex-shrink-0" />
+            </button>
+            <button 
               onClick={toggleTheme}
               className="w-12 h-12 flex items-center justify-center rounded-full hover:bg-on-surface/5 text-on-surface-variant transition-colors"
               aria-label="Toggle Theme"
             >
               {isDarkMode ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />}
             </button>
-            <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-sm ml-2">
-              US
-            </div>
+            
+            {user ? (
+               <div className="relative group ml-2">
+                 <button className="flex items-center gap-2 rounded-full hover:bg-surface-variant/50 p-1 pl-3 transition-colors">
+                   <span className="text-label-medium font-medium max-w-[100px] truncate">{user.displayName || user.email}</span>
+                   {user.photoURL ? (
+                     <img src={user.photoURL} alt="User Avatar" className="w-10 h-10 rounded-full object-cover border border-outline-variant" referrerPolicy="no-referrer" />
+                   ) : (
+                     <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-sm">
+                       {user.email?.[0].toUpperCase()}
+                     </div>
+                   )}
+                 </button>
+                 <div className="absolute right-0 top-full mt-2 w-48 py-2 bg-surface-container-high rounded-xl shadow-elevation-3 border border-outline-variant opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+                   <button onClick={logoutAndClearSession} className="w-full text-left px-4 py-2 text-body-medium hover:bg-surface-variant text-on-surface">
+                     Sair
+                   </button>
+                 </div>
+               </div>
+            ) : (
+               <button 
+                 onClick={signInWithGoogle}
+                 className="h-10 px-6 ml-2 rounded-full bg-primary text-on-primary font-medium hover:bg-primary/90 transition-colors shadow-elevation-1 flex items-center gap-2 text-label-large"
+               >
+                 Login
+               </button>
+            )}
           </div>
         </header>
 
@@ -395,6 +459,7 @@ export default function App() {
           </AnimatePresence>
         </div>
       </main>
+      <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </div>
   );
 }

@@ -178,9 +178,9 @@ export default function GraphicsStudio() {
       <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
 
       {modalOpen && modalConfig && (
-        <div className="absolute inset-0 z-50 bg-[#141414]/90 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-black/90 border border-blue-500/30 rounded-xl w-full max-w-md p-6 relative shadow-[0_0_50px_rgba(59,130,246,0.1)]">
-            <h2 className="text-xl font-bold text-white mb-6 uppercase tracking-widest">{modalConfig.title}</h2>
+        <div className="absolute inset-0 z-50 bg-surface-container/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-surface-container-highest border border-secondary/30 rounded-xl w-full max-w-md p-6 relative shadow-[0_0_50px_rgba(59,130,246,0.1)]">
+            <h2 className="text-headline-small font-bold text-on-surface mb-6 uppercase tracking-widest">{modalConfig.title}</h2>
             {modalConfig.inputPlaceholder !== undefined ? (
               <form onSubmit={(e) => {
                 e.preventDefault();
@@ -190,24 +190,24 @@ export default function GraphicsStudio() {
                 if (modalConfig.onSubmit) modalConfig.onSubmit(val);
               }}>
                 <div className="flex flex-col gap-1.5 mb-6">
-                  <label className="text-[10px] uppercase text-gray-500 font-bold">Descreva a nova paleta</label>
+                  <label className="text-label-small uppercase text-on-surface-variant opacity-60 font-bold">Descreva a nova paleta</label>
                   <input 
                     autoFocus
                     name="inputVal"
                     placeholder={modalConfig.inputPlaceholder}
-                    className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-cyan-400 outline-none focus:border-cyan-500 transition-colors" 
+                    className="bg-surface-variant/50 border border-outline rounded-lg px-3 py-2 text-body-medium text-primary outline-none focus:border-primary transition-colors" 
                   />
                 </div>
                 <div className="flex justify-end gap-3">
-                  <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 border border-white/10 rounded-lg text-xs font-bold text-gray-400 hover:bg-white/5 transition-all">CANCELAR</button>
-                  <button type="submit" className="px-5 py-2 bg-blue-500 text-white text-xs font-bold rounded-lg hover:bg-blue-400 transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)]">GERAR</button>
+                  <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 border border-outline rounded-lg text-label-medium font-bold text-on-surface-variant opacity-80 hover:bg-surface-container transition-all">CANCELAR</button>
+                  <button type="submit" className="px-5 py-2 bg-secondary hover:bg-secondary/90 text-on-surface text-label-medium font-bold rounded-lg hover:bg-blue-400 transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)]">GERAR</button>
                 </div>
               </form>
             ) : (
               <div>
-                <p className="text-gray-300 text-sm mb-6">{modalConfig.message}</p>
+                <p className="text-on-surface-variant text-body-medium mb-6">{modalConfig.message}</p>
                 <div className="flex justify-end gap-3">
-                  <button type="button" onClick={() => setModalOpen(false)} className="px-5 py-2 bg-blue-500 text-white text-xs font-bold rounded-lg hover:bg-blue-400 transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)]">OK</button>
+                  <button type="button" onClick={() => setModalOpen(false)} className="px-5 py-2 bg-secondary hover:bg-secondary/90 text-on-surface text-label-medium font-bold rounded-lg hover:bg-blue-400 transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)]">OK</button>
                 </div>
               </div>
             )}
@@ -215,26 +215,26 @@ export default function GraphicsStudio() {
         </div>
       )}
       
-      <div className="flex justify-between items-center bg-[#141414] p-6 rounded-2xl border border-white/5 shrink-0">
+      <div className="flex justify-between items-center bg-surface-container p-6 rounded-2xl border border-outline-variant shrink-0">
         <div className="flex gap-4 items-center">
-          <div className="p-3 bg-blue-500/20 text-blue-400 rounded-xl">
+          <div className="p-3 bg-secondary hover:bg-secondary/90/20 text-secondary rounded-xl">
             <ImageIcon className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-white font-bold text-xl">Texture & Sprite Studio</h2>
-            <p className="text-gray-500 text-sm">Visualização de VRAM, Tilemaps e extração de Gráficos Raw.</p>
+            <h2 className="text-on-surface font-bold text-headline-small">Texture & Sprite Studio</h2>
+            <p className="text-on-surface-variant opacity-60 text-body-medium">Visualização de VRAM, Tilemaps e extração de Gráficos Raw.</p>
           </div>
         </div>
         <div className="flex gap-3">
            <button 
              onClick={() => fileInputRef.current?.click()}
-             className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-gray-300 font-bold flex items-center gap-2 hover:bg-white/10 transition-all"
+             className="px-4 py-2 bg-surface-container border border-outline rounded-xl text-on-surface-variant font-bold flex items-center gap-2 hover:bg-surface-container-high transition-all"
            >
              <Upload className="w-4 h-4" /> LOAD BINARY
            </button>
            <button 
              onClick={askAiToRecolor}
-             className="px-4 py-2 bg-blue-500/10 border border-blue-500/30 text-blue-400 font-bold rounded-xl flex items-center gap-2 hover:bg-blue-500 hover:text-white transition-all shadow-[0_0_15px_rgba(59,130,246,0.15)]"
+             className="px-4 py-2 bg-secondary hover:bg-secondary/90/10 border border-secondary/30 text-secondary font-bold rounded-xl flex items-center gap-2 hover:bg-secondary hover:bg-secondary/90 hover:text-on-surface transition-all shadow-[0_0_15px_rgba(59,130,246,0.15)]"
            >
              <Sparkles className="w-4 h-4" /> AI PALETTE
            </button>
@@ -264,7 +264,7 @@ export default function GraphicsStudio() {
                  message: aiMessage 
                });
              }}
-             className="px-4 py-2 bg-purple-500/10 border border-purple-500/30 text-purple-400 font-bold rounded-xl flex items-center gap-2 hover:bg-purple-500 hover:text-white transition-all shadow-[0_0_15px_rgba(168,85,247,0.15)]"
+             className="px-4 py-2 bg-tertiary/10 border border-tertiary/30 text-tertiary font-bold rounded-xl flex items-center gap-2 hover:bg-tertiary hover:text-on-surface transition-all shadow-[0_0_15px_rgba(168,85,247,0.15)]"
            >
              <Zap className="w-4 h-4" /> AI HOOK SUGGESTION
            </button>
@@ -273,15 +273,15 @@ export default function GraphicsStudio() {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1 min-h-0">
         <div className="lg:col-span-1 space-y-4 overflow-y-auto custom-scrollbar pr-2">
-            <div className="bg-[#141414] border border-white/5 rounded-2xl p-6 space-y-6">
-                <h3 className="text-white font-bold text-sm tracking-widest uppercase flex items-center gap-2">
-                    <Settings2 className="w-4 h-4 text-gray-400" /> Decode Settings
+            <div className="bg-surface-container border border-outline-variant rounded-2xl p-6 space-y-6">
+                <h3 className="text-on-surface font-bold text-body-medium tracking-widest uppercase flex items-center gap-2">
+                    <Settings2 className="w-4 h-4 text-on-surface-variant opacity-80" /> Decode Settings
                 </h3>
                 
                 <div className="space-y-4">
                     <div className="space-y-2">
-                        <label className="text-[10px] text-gray-500 font-bold uppercase">Formato / BPP (Bits Per Pixel)</label>
-                        <select className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-sm text-cyan-400 outline-none focus:border-cyan-500" value={bpp} onChange={(e) => setBpp(Number(e.target.value))}>
+                        <label className="text-label-small text-on-surface-variant opacity-60 font-bold uppercase">Formato / BPP (Bits Per Pixel)</label>
+                        <select className="w-full bg-surface-variant/50 border border-outline rounded-lg p-2 text-body-medium text-primary outline-none focus:border-primary" value={bpp} onChange={(e) => setBpp(Number(e.target.value))}>
                             <option value={1}>1BPP (Mono)</option>
                             <option value={2}>2BPP (GameBoy / NES planar)</option>
                             <option value={4}>4BPP (SNES / GBA planar)</option>
@@ -289,10 +289,10 @@ export default function GraphicsStudio() {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-[10px] text-gray-500 font-bold uppercase">Offset Hexadecimal (Start)</label>
+                        <label className="text-label-small text-on-surface-variant opacity-60 font-bold uppercase">Offset Hexadecimal (Start)</label>
                         <input 
                             type="text" 
-                            className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-sm text-cyan-400 font-mono outline-none focus:border-cyan-500 uppercase" 
+                            className="w-full bg-surface-variant/50 border border-outline rounded-lg p-2 text-body-medium text-primary font-mono outline-none focus:border-primary uppercase" 
                             value={offset.toString(16).toUpperCase()}
                             onChange={(e) => {
                                 const val = parseInt(e.target.value, 16);
@@ -302,19 +302,19 @@ export default function GraphicsStudio() {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-[10px] text-gray-500 font-bold uppercase">Largura (em Tiles)</label>
+                        <label className="text-label-small text-on-surface-variant opacity-60 font-bold uppercase">Largura (em Tiles)</label>
                         <input 
                             type="number" 
-                            className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-sm text-cyan-400 outline-none focus:border-cyan-500" 
+                            className="w-full bg-surface-variant/50 border border-outline rounded-lg p-2 text-body-medium text-primary outline-none focus:border-primary" 
                             value={width}
                             onChange={(e) => setWidth(Number(e.target.value))}
                         />
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-[10px] text-gray-500 font-bold uppercase flex items-center gap-2"><Palette className="w-3 h-3" /> Paleta de Cores (Hex)</label>
+                        <label className="text-label-small text-on-surface-variant opacity-60 font-bold uppercase flex items-center gap-2"><Palette className="w-3 h-3" /> Paleta de Cores (Hex)</label>
                         <textarea 
-                            className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-xs text-gray-400 font-mono outline-none focus:border-cyan-500 resize-none h-24" 
+                            className="w-full bg-surface-variant/50 border border-outline rounded-lg p-2 text-label-medium text-on-surface-variant opacity-80 font-mono outline-none focus:border-primary resize-none h-24" 
                             value={paletteHex}
                             onChange={(e) => setPaletteHex(e.target.value)}
                         />
@@ -322,19 +322,19 @@ export default function GraphicsStudio() {
                 </div>
             </div>
             
-            <div className="bg-[#141414] border border-white/5 rounded-2xl p-6">
-                 <h3 className="text-white font-bold text-sm tracking-widest uppercase mb-4">Export Tools</h3>
+            <div className="bg-surface-container border border-outline-variant rounded-2xl p-6">
+                 <h3 className="text-on-surface font-bold text-body-medium tracking-widest uppercase mb-4">Export Tools</h3>
                  <div className="grid grid-cols-1 gap-2">
                    <button 
                      onClick={exportPNG}
-                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-white/5 border border-white/10 text-gray-300 font-bold rounded-lg hover:bg-white/10 transition-all text-sm disabled:opacity-50" 
+                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-surface-container border border-outline text-on-surface-variant font-bold rounded-lg hover:bg-surface-container-high transition-all text-body-medium disabled:opacity-50" 
                      disabled={!fileData}
                    >
-                       <Download className="w-4 h-4 text-cyan-400" /> Export PNG
+                       <Download className="w-4 h-4 text-primary" /> Export PNG
                    </button>
                    <button 
                      onClick={exportOBJ}
-                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-white/5 border border-white/10 text-gray-300 font-bold rounded-lg hover:bg-white/10 transition-all text-sm disabled:opacity-50" 
+                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-surface-container border border-outline text-on-surface-variant font-bold rounded-lg hover:bg-surface-container-high transition-all text-body-medium disabled:opacity-50" 
                      disabled={!fileData}
                    >
                        <Box className="w-4 h-4 text-fuchsia-400" /> Export OBJ (Mesh)
@@ -343,29 +343,29 @@ export default function GraphicsStudio() {
             </div>
         </div>
 
-        <div className="lg:col-span-3 bg-[#141414] border border-white/5 rounded-2xl flex flex-col min-h-0 overflow-hidden relative">
+        <div className="lg:col-span-3 bg-surface-container border border-outline-variant rounded-2xl flex flex-col min-h-0 overflow-hidden relative">
             <div className="absolute top-4 right-4 z-10 flex gap-2">
-                <button onClick={() => setShowGrid(!showGrid)} className={`p-2 bg-black/60 backdrop-blur border border-white/10 rounded-lg transition-colors ${showGrid ? 'text-white bg-white/20' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}>
+                <button onClick={() => setShowGrid(!showGrid)} className={`p-2 bg-surface-container-high backdrop-blur border border-outline rounded-lg transition-colors ${showGrid ? 'text-on-surface bg-surface-container-highest' : 'text-on-surface-variant opacity-80 hover:text-on-surface hover:bg-surface-container-high'}`}>
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
                 </button>
-                <button onClick={() => setZoom(z => Math.max(1, z - 1))} className="p-2 bg-black/60 backdrop-blur border border-white/10 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors">
+                <button onClick={() => setZoom(z => Math.max(1, z - 1))} className="p-2 bg-surface-container-high backdrop-blur border border-outline rounded-lg text-on-surface-variant opacity-80 hover:text-on-surface hover:bg-surface-container-high transition-colors">
                     <ZoomOut className="w-4 h-4" />
                 </button>
-                <button onClick={() => setZoom(z => Math.min(8, z + 1))} className="p-2 bg-black/60 backdrop-blur border border-white/10 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors">
+                <button onClick={() => setZoom(z => Math.min(8, z + 1))} className="p-2 bg-surface-container-high backdrop-blur border border-outline rounded-lg text-on-surface-variant opacity-80 hover:text-on-surface hover:bg-surface-container-high transition-colors">
                     <ZoomIn className="w-4 h-4" />
                 </button>
             </div>
 
-            <div className="flex-1 bg-black overflow-auto custom-scrollbar flex items-center justify-center relative p-8">
+            <div className="flex-1 bg-surface-container-lowest overflow-auto custom-scrollbar flex items-center justify-center relative p-8">
                 {fileData ? (
                     <div style={{ transform: `scale(${zoom})`, transformOrigin: 'center center', transition: 'transform 0.2s ease-out', position: 'relative' }}>
-                        <canvas ref={canvasRef} className="image-rendering-pixelated shadow-[0_0_20px_rgba(0,0,0,0.5)] border border-white/5" />
+                        <canvas ref={canvasRef} className="image-rendering-pixelated shadow-[0_0_20px_rgba(0,0,0,0.5)] border border-outline-variant" />
                         {showGrid && (
                             <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'linear-gradient(to right, rgba(255,255,255,0.15) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.15) 1px, transparent 1px)', backgroundSize: '8px 8px' }} />
                         )}
                     </div>
                 ) : (
-                    <div className="text-gray-600 flex flex-col items-center gap-4">
+                    <div className="text-outline flex flex-col items-center gap-4">
                         <ImageIcon className="w-12 h-12 opacity-50" />
                         <p>Nenhuma ROM carregada. Carregue para visualizar gráficos.</p>
                     </div>

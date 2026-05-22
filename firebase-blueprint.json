@@ -1,0 +1,41 @@
+{
+  "entities": {
+    "project": {
+      "title": "Project",
+      "description": "Represents a retro-forge project",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "platform": { "type": "string" },
+        "status": { "type": "string" },
+        "health": { "type": "number" },
+        "analysisStatus": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["name", "platform", "status", "health", "analysisStatus", "ownerId", "createdAt", "updatedAt"]
+    },
+    "userProfile": {
+      "title": "UserProfile",
+      "description": "User profile data",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["email", "createdAt"]
+    }
+  },
+  "firestore": {
+    "projects": {
+      "schema": "project",
+      "description": "Stores user projects"
+    },
+    "users": {
+      "schema": "userProfile",
+      "description": "Stores user profiles"
+    }
+  }
+}
