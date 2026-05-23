@@ -67,7 +67,7 @@ export class ProjectService {
 
     // System Monitor: Listen for ROM changes triggered by backend fs.watch
     wsService.on("ROM_FILE_MUTATION", (data: any) => {
-      logger.log('INFO', 'projectService', `fs.watch: ROM file changed [${data.eventType}] - ${data.filename}`);
+      logger.info(`[projectService] fs.watch: ROM file changed [${data.eventType}] - ${data.filename}`);
       eventBus.emit('ROM_SYNC_DETECTED', data);
     });
 

@@ -254,6 +254,15 @@ int process_status_logic(EntityHealth* entity_ptr) {
   const [assets, setAssets] = useState<any[]>([]);
 
   useEffect(() => {
+     const handlePresetDeployed = (preset: {name: string, payload: string}) => {
+       setModIntent(preset.payload);
+       addAgentLog(`[PRESET LOADED] Preset deploy detectado via event bus: ${preset.name} -> Target Intent: ${preset.payload}`);
+       showToast('success', `Preset carregado: ${preset.name}`);
+       document.getElementById('mod-intent-input')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+     };
+     
+     eventBus.on('MOD_PRESET_DEPLOYED', handlePresetDeployed);
+
      const interval = setInterval(async () => {
         try {
            const res = await fetch('/api/system/health');
@@ -261,7 +270,10 @@ int process_status_logic(EntityHealth* entity_ptr) {
            setHealth(data);
         } catch {}
      }, 5000);
-     return () => clearInterval(interval);
+     return () => {
+        clearInterval(interval);
+        eventBus.off('MOD_PRESET_DEPLOYED', handlePresetDeployed);
+     };
   }, []);
 
   const scanForAssets = async () => {
@@ -813,6 +825,7 @@ int process_status_logic(EntityHealth* entity_ptr) {
                       <div className="space-y-1.5">
                         <label className="text-label-small font-bold text-on-surface-variant opacity-80 uppercase">Modification Intent</label>
                         <input 
+                          id="mod-intent-input"
                           value={modIntent}
                           onChange={(e) => setModIntent(e.target.value)}
                           className="w-full bg-surface-container border border-outline rounded-lg px-4 py-2 text-on-surface font-mono text-body-medium focus:border-yellow-500/50 outline-none"
@@ -3183,6 +3196,7 @@ int process_status_logic(EntityHealth* entity_ptr) {
                             <BrainCircuit className="w-3 h-3" /> Mod Intent (Context)
                           </label>
                           <input 
+                            id="mod-intent-input-2"
                             type="text"
                             value={modIntent}
                             onChange={(e) => setModIntent(e.target.value)}

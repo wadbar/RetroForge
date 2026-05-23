@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Activity, ShieldAlert, Cpu, Radio, Trash2, Zap, CheckCircle2, AlertTriangle, XCircle, TrendingUp, Moon, Sun } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LineChart, Line, ResponsiveContainer, YAxis, Tooltip, AreaChart, Area } from 'recharts';
@@ -11,6 +11,65 @@ export const Panel: React.FC = () => {
   const [recentEvents, setRecentEvents] = useState<{name: string, time: string}[]>([]);
   const [chartData, setChartData] = useState<{val: number}[]>([]);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [modPresets, setModPresets] = useState<{name: string, payload: string}[]>([
+    { name: 'Infinite Health', payload: 'EA EA EA' },
+    { name: 'Max Coins', payload: 'FF FF 00 00' },
+    { name: 'Unlock All Items', payload: '01 01 01 01' }
+  ]);
+  const [newPresetName, setNewPresetName] = useState('');
+  const [newPresetPayload, setNewPresetPayload] = useState('');
+  const [presetError, setPresetError] = useState('');
+
+  useEffect(() => {
+    const savedPresets = localStorage.getItem('RF_MOD_PRESETS');
+    if (savedPresets) {
+      try {
+        setModPresets(JSON.parse(savedPresets));
+      } catch (e) {}
+    }
+  }, []);
+
+  const savePreset = useCallback(() => {
+    if (!newPresetName || !newPresetPayload) return;
+    
+    if (!/^[0-9A-Fa-f\s]+$/.test(newPresetPayload)) {
+      setPresetError('Payload inv\u00e1lido: Use apenas caracteres hexadecimais e espa\u00e7os.');
+      return;
+    }
+    setPresetError('');
+    
+    setModPresets(prev => {
+      const newPresets = [...prev, { name: newPresetName, payload: newPresetPayload }];
+      try {
+        localStorage.setItem('RF_MOD_PRESETS', JSON.stringify(newPresets));
+      } catch (e) {
+        console.error("Failed to persist presets:", e);
+      }
+      return newPresets;
+    });
+    setNewPresetName('');
+    setNewPresetPayload('');
+  }, [newPresetName, newPresetPayload]);
+
+  const deletePreset = useCallback((idx: number) => {
+    setModPresets(prev => {
+      const newPresets = prev.filter((_, i) => i !== idx);
+      try {
+        localStorage.setItem('RF_MOD_PRESETS', JSON.stringify(newPresets));
+      } catch (e) {
+        console.error("Failed to persist presets:", e);
+      }
+      return newPresets;
+    });
+  }, []);
+
+  const deployPreset = useCallback((preset: {name: string, payload: string}) => {
+    try {
+      eventBus.emit('MOD_PRESET_DEPLOYED', preset);
+    } catch (e) {
+      console.error("Failed to deploy preset:", e);
+    }
+  }, []);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('RF_THEME');
@@ -32,29 +91,43 @@ export const Panel: React.FC = () => {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-    const interval = setInterval(() => {
-      const currentHealth = monitor.getHealthData();
-      setHealth(currentHealth);
-      setChartData(prev => {
-        const lastLat = currentHealth.metrics.latency[currentHealth.metrics.latency.length - 1] || 0;
-        const newData = [...prev, { val: lastLat }];
-        return newData.slice(-15);
-      });
-    }, 2000);
+  useEffect(() => {
+    let isActive = true;
+    let interval: NodeJS.Timeout | null = null;
+    
+    const tick = () => {
+      if (!isActive) return;
+      try {
+        const currentHealth = monitor.getHealthData();
+        setHealth(currentHealth);
+        setChartData(prev => {
+          const lastLat = currentHealth.metrics.latency[currentHealth.metrics.latency.length - 1] || 0;
+          const newData = [...prev, { val: lastLat }];
+          return newData.slice(-15);
+        });
+      } catch (error) {
+        console.error("Monitor polling failed", error);
+      }
+    };
 
-    const handleEvent = (_data: any, name: string) => {
+    interval = setInterval(tick, 2000);
+
+    const handleEvent = (data: any, name: string) => {
+      if (!isActive) return;
       setRecentEvents(prev => [{ name, time: new Date().toLocaleTimeString() }, ...prev].slice(0, 5));
     };
 
     const subs = ["ROM_LOADED", "AI_ANALYSIS_COMPLETE", "PATCH_GENERATED", "SCAN_PERFORMED", "SELF_HEALING_REQUIRED"];
     const handlers: Record<string, (data: any) => void> = {};
+    
     subs.forEach(s => {
        handlers[s] = (data) => handleEvent(data, s);
        eventBus.on(s, handlers[s]);
     });
 
     return () => {
-      clearInterval(interval);
+      isActive = false;
+      if (interval) clearInterval(interval);
       subs.forEach(s => eventBus.off(s, handlers[s]));
     };
   }, []);
@@ -147,7 +220,7 @@ export const Panel: React.FC = () => {
           <div className="flex flex-col gap-4">
             <h3 className="text-title-medium text-on-surface flex items-center justify-between">
               Recent Dispatches
-              <button className="m3-button-tonal !px-4 !py-2 flex items-center gap-2 text-on-surface-variant hover:text-error" onClick={() => setRecentEvents([])}>
+              <button className="m3-button-tonal flex items-center gap-2" onClick={() => setRecentEvents([])}>
                  <Trash2 className="w-4 h-4" />
                  <span className="text-label-large">Clear</span>
               </button>
@@ -215,6 +288,74 @@ export const Panel: React.FC = () => {
             </div>
           </div>
         )}
+
+        <div className="mt-8 m3-card !bg-surface-container-high !p-6 flex flex-col gap-4">
+          <div className="flex items-center gap-2 text-title-medium text-on-surface">
+            <Radio className="w-5 h-5 text-primary" />
+            Quick Mod Presets (Patches Recorrentes)
+          </div>
+          <p className="text-body-medium text-on-surface-variant">Salvamento e envio r&aacute;pido de payloads predefinidos (ex: Infinite Health) para a engine de inje&ccedil;&atilde;o.</p>
+
+          <div className="flex flex-col sm:flex-row gap-3">
+             <input 
+               type="text" 
+               placeholder="Nome (ex: Infinite Health)" 
+               className="m3-input flex-1"
+               value={newPresetName}
+               onChange={e => { setNewPresetName(e.target.value); setPresetError(''); }}
+             />
+             <input 
+               type="text" 
+               placeholder="Payload (apenas Hex e espaços)" 
+               className="m3-input flex-1"
+               value={newPresetPayload}
+               onChange={e => {
+                 const val = e.target.value;
+                 setNewPresetPayload(val);
+                 if (val && !/^[0-9A-Fa-f\s]+$/.test(val)) {
+                   setPresetError('Payload inválido: Use apenas caracteres hexadecimais e espaços.');
+                 } else {
+                   setPresetError('');
+                 }
+               }}
+             />
+             <button 
+               onClick={savePreset}
+               disabled={!newPresetName || !newPresetPayload || Boolean(presetError)}
+               className="m3-button-filled disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+             >
+               Add Preset
+             </button>
+          </div>
+          {presetError && (
+             <p className="text-error text-body-small mt-2 px-2">{presetError}</p>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+            {modPresets.map((preset, i) => (
+              <div key={i} className="bg-surface border border-outline-variant rounded-[16px] p-4 flex flex-col gap-3 relative group">
+                 <button onClick={() => deletePreset(i)} className="m3-button-tonal absolute top-2 right-2 opacity-0 group-hover:opacity-100 focus:opacity-100 flex items-center justify-center" title="Remove Preset">
+                   <Trash2 className="w-4 h-4" />
+                 </button>
+                 <div className="flex flex-col pr-6">
+                    <span className="text-label-large font-bold text-on-surface">{preset.name}</span>
+                    <span className="text-body-small text-on-surface-variant font-mono truncate">{preset.payload}</span>
+                 </div>
+                 <button 
+                   onClick={() => deployPreset(preset)}
+                   className="m3-button-tonal w-full mt-auto flex justify-center items-center gap-2"
+                 >
+                   <Zap className="w-4 h-4" /> Aplicar Mod
+                 </button>
+              </div>
+            ))}
+            {modPresets.length === 0 && (
+              <div className="col-span-full p-6 text-center border border-dashed border-outline-variant rounded-[16px] text-on-surface-variant">
+                Nenhum preset salvo. Adicione patches usando o formul&aacute;rio acima.
+              </div>
+            )}
+          </div>
+        </div>
       </motion.div>
     </div>
   );
