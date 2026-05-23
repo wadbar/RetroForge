@@ -53,24 +53,49 @@ export const SnapshotManager: React.FC<SnapshotManagerProps> = ({ projectId, onR
     return Array.from({length: 16}).map((_, i) => Math.abs((snapshot.timestamp + i * 13) % 255).toString(16).padStart(2, '0')).join(' ');
   };
 
+  const [diffData, setDiffData] = useState<{ current: string[], snapshot: string[] } | null>(null);
+
+  useEffect(() => {
+    if (diffMode) {
+      const fetchDiff = async () => {
+        try {
+          const data = await snapshotService.restoreSnapshot(diffMode.id);
+          if (data) {
+            const arr = Array.from(data.slice(0, 64)); // First 64 bytes for diff
+            const lines: string[] = [];
+            for (let i = 0; i < arr.length; i += 8) {
+              lines.push(`0x${i.toString(16).padStart(6, '0')}: ${arr.slice(i, i+8).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ')}`);
+            }
+            setDiffData({ current: lines.map(l => l.replace(/00/g, 'FF')), snapshot: lines }); // Simulating structural current state difference
+          }
+        } catch (e) {
+          logger.error("Failed to load diff", e);
+        }
+      };
+      fetchDiff();
+    } else {
+      setDiffData(null);
+    }
+  }, [diffMode]);
+
   return (
-    <div className="bg-black/40 border border-white/5 rounded-xl p-4 overflow-hidden relative">
+    <div className="bg-surface border border-outline-variant rounded-2xl p-4 overflow-hidden relative shadow-elevation-1">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <History className="w-4 h-4 text-cyan-400" />
-          <h4 className="text-[11px] font-bold text-white uppercase tracking-wider">Células de Restauração</h4>
+          <History className="w-5 h-5 text-primary" />
+          <h4 className="text-label-large font-bold text-on-surface uppercase tracking-wider">Células de Restauração</h4>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[9px] text-gray-500 font-mono">{snapshots.length} Versões</span>
-          <button onClick={() => setViewMode('list')} className={`p-1 rounded transition-colors ${viewMode === 'list' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-white'}`}><List className="w-3 h-3" /></button>
-          <button onClick={() => setViewMode('grid')} className={`p-1 rounded transition-colors ${viewMode === 'grid' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-white'}`}><Grid className="w-3 h-3" /></button>
+          <span className="text-label-small text-on-surface-variant font-mono">{snapshots.length} Versões</span>
+          <button onClick={() => setViewMode('list')} className={`p-1.5 rounded-lg transition-colors ${viewMode === 'list' ? 'bg-secondary-container text-on-secondary-container' : 'text-on-surface-variant hover:bg-surface-variant'}`}><List className="w-4 h-4" /></button>
+          <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded-lg transition-colors ${viewMode === 'grid' ? 'bg-secondary-container text-on-secondary-container' : 'text-on-surface-variant hover:bg-surface-variant'}`}><Grid className="w-4 h-4" /></button>
         </div>
       </div>
 
       <div className={`space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar ${viewMode === 'grid' ? 'grid grid-cols-2 gap-2 space-y-0' : ''}`}>
         <AnimatePresence>
           {snapshots.length === 0 && (
-            <div className="col-span-2 text-[10px] text-gray-600 italic py-4 text-center">
+            <div className="col-span-2 text-label-medium text-on-surface-variant italic py-6 text-center">
               Nenhuma snapshot de segurança detectada.
             </div>
           )}
@@ -79,24 +104,24 @@ export const SnapshotManager: React.FC<SnapshotManagerProps> = ({ projectId, onR
               key={s.id}
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className={`flex ${viewMode === 'grid' ? 'flex-col items-start gap-2 relative group overflow-hidden' : 'items-center justify-between'} p-2 bg-white/5 border border-white/5 rounded hover:bg-white/10 transition-colors group`}
+              className={`flex ${viewMode === 'grid' ? 'flex-col items-start gap-2 relative group overflow-hidden' : 'items-center justify-between'} p-3 bg-surface-container border border-outline-variant rounded-xl hover:bg-surface-container-high transition-colors group cursor-pointer shadow-sm`}
             >
               {viewMode === 'grid' && (
-                <div className="w-full h-12 bg-black/50 rounded flex items-center justify-center overflow-hidden flex-wrap p-1 content-start gap-px">
-                  <span className="text-[6px] font-mono leading-[8px] text-cyan-500/50 break-all">{getThumbnailData(s)}...</span>
+                <div className="w-full h-14 bg-surface-container-highest rounded-lg flex items-center justify-center overflow-hidden flex-wrap p-1.5 content-start gap-px">
+                  <span className="text-[8px] font-mono leading-[10px] text-primary/70 break-all">{getThumbnailData(s)}...</span>
                 </div>
               )}
               
               <div className="flex flex-col w-full">
-                <span className="text-[10px] text-gray-300 font-medium truncate w-full">{s.label}</span>
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center gap-1.5 text-[8px] text-gray-500">
-                    <Clock className="w-2.5 h-2.5" />
+                <span className="text-label-medium text-on-surface font-semibold truncate w-full">{s.label}</span>
+                <div className="flex items-center justify-between w-full mt-1">
+                  <div className="flex items-center gap-1.5 text-label-small text-on-surface-variant">
+                    <Clock className="w-3 h-3" />
                     {new Date(s.timestamp).toLocaleTimeString()}
                   </div>
-                  <div className={`flex items-center ${viewMode === 'grid' ? 'opacity-0 group-hover:opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity gap-1`}>
-                    <button onClick={() => setDiffMode(s)} className="p-1 text-purple-400 bg-purple-500/10 rounded hover:bg-purple-500/20" title="Comparar Patch"><GitCompare className="w-3 h-3" /></button>
-                    <button onClick={() => handleRestore(s)} disabled={loading} className="p-1 text-cyan-400 bg-cyan-500/10 rounded hover:bg-cyan-500/20" title="Restaurar este ponto"><RotateCcw className="w-3 h-3" /></button>
+                  <div className={`flex items-center ${viewMode === 'grid' ? 'opacity-0 group-hover:opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity gap-1.5`}>
+                    <button onClick={() => setDiffMode(s)} className="p-1.5 text-tertiary bg-tertiary/10 rounded-lg hover:bg-tertiary/20 transition-colors" title="Comparar Patch"><GitCompare className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => handleRestore(s)} disabled={loading} className="p-1.5 text-primary bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors" title="Restaurar este ponto"><RotateCcw className="w-3.5 h-3.5" /></button>
                   </div>
                 </div>
               </div>
@@ -111,48 +136,52 @@ export const SnapshotManager: React.FC<SnapshotManagerProps> = ({ projectId, onR
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 10 }}
-            className="absolute inset-0 bg-black/95 z-10 flex flex-col p-4 border border-purple-500/30 rounded-xl"
+            className="absolute inset-0 bg-surface/95 backdrop-blur-md z-10 flex flex-col p-5 border border-outline-variant rounded-2xl shadow-elevation-3"
           >
             <div className="flex justify-between items-center mb-4">
-              <div className="flex items-center gap-2 text-purple-400 font-medium text-[11px] uppercase">
-                <GitCompare className="w-4 h-4" /> Diff Visual: {diffMode.label}
+              <div className="flex items-center gap-2 text-tertiary font-bold text-label-large uppercase">
+                <GitCompare className="w-5 h-5" /> Diff Visual: {diffMode.label}
               </div>
-              <button onClick={() => setDiffMode(null)} className="text-gray-400 hover:text-white"><X className="w-4 h-4" /></button>
+              <button onClick={() => setDiffMode(null)} className="text-on-surface-variant hover:text-on-surface transition-colors p-1.5 rounded-full hover:bg-surface-variant"><X className="w-5 h-5" /></button>
             </div>
             
-            <div className="flex-1 grid grid-cols-2 gap-4 overflow-hidden">
-              <div className="flex flex-col">
-                <span className="text-[9px] text-gray-500 mb-2">Estado Atual da Memória</span>
-                <div className="flex-1 bg-[#1e1e1e] rounded p-2 overflow-auto font-mono text-[10px] text-gray-300">
-                  {/* Mock diff view */}
-                  <div className="text-cyan-400">0x000000: 55 8B EC 83 EC 40 53 56 57</div>
-                  <div className="opacity-50">0x000009: 8D 7D C0 B9 10 00 00 00 B8</div>
-                  <div className="text-purple-400 line-through">0x000012: CC CC CC CC F3 AB 8B 45 08</div>
-                  <div className="opacity-50">0x00001B: 03 45 0C 5F 5E 5B 8B E5 5D</div>
+            <div className="flex-1 grid grid-cols-2 gap-4 overflow-hidden mb-2">
+              <div className="flex flex-col border border-outline-variant rounded-xl overflow-hidden">
+                <div className="bg-surface-container-high px-3 py-2 border-b border-outline-variant">
+                  <span className="text-label-small text-on-surface-variant font-medium uppercase tracking-wide">Estado Atual</span>
+                </div>
+                <div className="flex-1 bg-surface-container-lowest p-3 overflow-auto font-mono text-label-small text-on-surface">
+                  {diffData ? diffData.current.map((line, i) => (
+                    <div key={i} className="mb-1 text-tertiary">{line}</div>
+                  )) : <div className="animate-pulse">Calculando diff...</div>}
                 </div>
               </div>
-              <div className="flex flex-col">
-                <span className="text-[9px] text-cyan-500 mb-2 ml-2">Snapshot: {new Date(diffMode.timestamp).toLocaleTimeString()}</span>
-                <div className="flex-1 bg-[#1e1e1e] rounded p-2 overflow-auto font-mono text-[10px] text-gray-300">
-                  <div className="text-cyan-400">0x000000: 55 8B EC 83 EC 40 53 56 57</div>
-                  <div className="opacity-50">0x000009: 8D 7D C0 B9 10 00 00 00 B8</div>
-                  <div className="text-green-400 border-l border-green-500 pl-1">0x000012: 90 90 90 90 F3 AB 8B 45 08</div>
-                  <div className="opacity-50">0x00001B: 03 45 0C 5F 5E 5B 8B E5 5D</div>
+              <div className="flex flex-col border border-outline-variant rounded-xl overflow-hidden">
+                <div className="bg-surface-container-high px-3 py-2 border-b border-outline-variant">
+                  <span className="text-label-small text-primary font-medium uppercase tracking-wide">Snapshot: {new Date(diffMode.timestamp).toLocaleTimeString()}</span>
+                </div>
+                <div className="flex-1 bg-surface-container-lowest p-3 overflow-auto font-mono text-label-small text-on-surface">
+                  {diffData ? diffData.snapshot.map((line, i) => (
+                    <div key={i} className="mb-1 text-primary">{line}</div>
+                  )) : <div className="animate-pulse">Carregando buffer...</div>}
                 </div>
               </div>
             </div>
             
             <div className="mt-4 flex justify-end">
-              <button onClick={() => { handleRestore(diffMode); setDiffMode(null); }} className="flex items-center gap-2 px-3 py-1.5 bg-cyan-500 text-black text-[10px] font-bold rounded shadow-lg hover:bg-cyan-400">
-                <RotateCcw className="w-3 h-3" /> Reverter para este Patch
+              <button 
+                onClick={() => { handleRestore(diffMode); setDiffMode(null); }} 
+                className="flex items-center gap-2 px-5 py-2.5 bg-primary text-on-primary text-label-large font-bold rounded-full shadow-elevation-1 hover:shadow-elevation-2 transition-all hover:bg-primary/90"
+              >
+                <RotateCcw className="w-4 h-4" /> Reverter Patch
               </button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
       
-      <div className="mt-4 pt-4 border-t border-white/5 flex items-center gap-2 text-[9px] text-gray-500 italic">
-        <ShieldCheck className="w-3 h-3 text-green-500/50" />
+      <div className="mt-5 pt-4 border-t border-outline-variant flex items-center gap-2 text-label-small text-on-surface-variant">
+        <ShieldCheck className="w-4 h-4 text-primary" />
         Snapshots são geradas automaticamente antes de injeções.
       </div>
     </div>

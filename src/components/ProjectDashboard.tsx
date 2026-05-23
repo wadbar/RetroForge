@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { Play, Clock, ChevronRight, Activity, Cpu, Monitor, Download, Plus, Upload, Trash2, X, Loader2, Github, RefreshCw, Binary, Zap, FileText, Code2, BrainCircuit, Network, Bug, SearchCode, ShieldAlert, Cloud, CloudOff } from 'lucide-react';
+import { Play, Clock, ChevronRight, Activity, Cpu, Monitor, Download, Plus, Upload, Trash2, X, Loader2, Github, RefreshCw, Binary, Zap, FileText, Code2, BrainCircuit, Network, Bug, SearchCode, ShieldAlert, Cloud, CloudOff, Database } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 import { logger } from '../services/loggerService';
@@ -9,6 +9,8 @@ import { ArchType } from '../core/types';
 import { eventBus } from '../services/eventBus';
 import { auth, db } from '../services/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
+
+import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface Project extends ProjectMetadata {
   progress: number;
@@ -64,8 +66,42 @@ export default function ProjectDashboard({ activeProjectId, onSelectProject, onS
   const [agentStatus, setAgentStatus] = useState<'idle' | 'analyzing' | 'extracting' | 'translating' | 'compiling' | 'deep_scanning' | 'done'>('idle');
   const [agentLogs, setAgentLogs] = useState<string[]>([]);
   const [agentProgress, setAgentProgress] = useState(0);
+  const [selectedFileExt, setSelectedFileExt] = useState('');
+
+  const handleRomFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const extMatch = file.name.match(/\.([^.]+)$/);
+    setSelectedFileExt(extMatch ? extMatch[1].toLowerCase() : '');
+
+    if (!newProjectName) setNewProjectName(file.name);
+    
+    try {
+      const buffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(buffer.slice(0, 2048));
+      const text = new TextDecoder().decode(bytes);
+      
+      if (text.includes("PS-X EXE")) {
+         setPlatform('MIPS_PS1');
+      } else if (text.includes("SEGA MEGA DRIVE") || text.includes("SEGA GENESIS") || text.includes("SEGA")) {
+         setPlatform('M68K_Genesis');
+      } else if (bytes[0] === 0x80 && bytes[1] === 0x37 && bytes[2] === 0x12 && bytes[3] === 0x40) {
+         setPlatform('N64');
+      } else if (bytes[156] === 0xCF && bytes[157] === 0x00) {
+         setPlatform('GBA'); 
+      } else if (text.includes("SUPER NINTENDO") || text.includes("NINTENDO")) {
+         setPlatform('SNES');
+      } else {
+         setPlatform('Other');
+      }
+    } catch (err) {
+      console.error("Auto detect failed", err);
+    }
+  };
 
   const [sysStats, setSysStats] = useState({ totalMem: '32.0 GB', usedMem: '1.2 GB', cpuLoad: '24' });
+  const [cpuHistory, setCpuHistory] = useState<{time: string, cpu: number, mem: number}[]>([]);
 
   const [hardwareAnalysis, setHardwareAnalysis] = useState<{[projectId: string]: {
     cpu: string;
@@ -343,10 +379,23 @@ export default function ProjectDashboard({ activeProjectId, onSelectProject, onS
         if (!res.ok) throw new Error('API Stats fetch failed');
         const data = await res.json();
         if (isMounted) {
+          const cpu = data.cpuLoadPercent !== undefined ? data.cpuLoadPercent : 12;
+          const memStr = data.usedMemoryStr ? parseFloat(data.usedMemoryStr) : 1.2;
+          const totalMemStr = data.totalMemoryStr ? parseFloat(data.totalMemoryStr) : 32.0;
+          const memPercent = (memStr / totalMemStr) * 100;
+          
           setSysStats({
             totalMem: data.totalMemoryStr || 'N/A',
             usedMem: data.usedMemoryStr || 'N/A',
-            cpuLoad: data.cpuLoadPercent !== undefined ? String(data.cpuLoadPercent) : '12'
+            cpuLoad: String(cpu)
+          });
+          setCpuHistory(prev => {
+            const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            return [...prev, { time: now, cpu, mem: memStr }].slice(-15);
+          });
+          
+          import('../services/monitorService').then((m) => {
+            m.monitor.trackResourceUsage(cpu, memPercent);
           });
         }
       } catch (e: any) {
@@ -413,11 +462,16 @@ export default function ProjectDashboard({ activeProjectId, onSelectProject, onS
   const projectGrid = useMemo(() => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {projects.map((project, idx) => (
-        <button 
+        <motion.button 
           key={project.id}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: idx * 0.05 }}
+          whileHover={{ y: -4 }}
+          whileTap={{ scale: 0.98 }}
           onClick={() => onSelectProject(project.id)}
           aria-label={`Selecionar projeto ${project.name}`}
-          className={`flex flex-col bg-surface-container-low border rounded-3xl p-6 group transition-all relative text-left w-full hover:shadow-elevation-1 min-h-[160px] ${
+          className={`flex flex-col bg-surface-container-low border rounded-3xl p-6 group transition-colors relative text-left w-full shadow-sm hover:shadow-elevation-2 min-h-[160px] ${
             activeProjectId === project.id ? 'border-primary ring-1 ring-primary shadow-elevation-2' : 'border-outline-variant hover:border-outline'
           }`}
         >
@@ -458,7 +512,7 @@ export default function ProjectDashboard({ activeProjectId, onSelectProject, onS
               </div>
             </div>
           </div>
-        </button>
+        </motion.button>
       ))}
     </div>
   ), [projects, activeProjectId, onSelectProject]);
@@ -481,6 +535,20 @@ export default function ProjectDashboard({ activeProjectId, onSelectProject, onS
     showToast('success', 'Relatório de Projetos exportado com sucesso.');
   };
 
+  const isPlatformCompatibleWithExt = () => {
+    if (!selectedFileExt) return true;
+    switch(platform) {
+      case 'SNES': return ['smc', 'sfc', 'bin'].includes(selectedFileExt);
+      case 'N64': return ['z64', 'n64', 'v64'].includes(selectedFileExt);
+      case 'GBA': return ['gba', 'bin'].includes(selectedFileExt);
+      case 'MIPS_PS1': return ['bin', 'iso', 'cue'].includes(selectedFileExt);
+      case 'M68K_Genesis': return ['md', 'smd', 'gen', 'bin'].includes(selectedFileExt);
+      case 'Other': return true;
+      default: return true;
+    }
+  };
+  const isCompatible = isPlatformCompatibleWithExt();
+
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-20">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-8">
@@ -500,6 +568,13 @@ export default function ProjectDashboard({ activeProjectId, onSelectProject, onS
             <Download className="w-5 h-5" />
             <span className="hidden md:inline">Exportar JSON</span>
           </button>
+          <button 
+            onClick={() => setIsModaling(true)} 
+            className="h-12 px-6 bg-secondary-container text-on-secondary-container rounded-full font-medium shadow-elevation-1 hover:shadow-elevation-2 transition-all flex items-center gap-2 tracking-wide"
+          >
+            <Plus className="w-5 h-5" /> 
+            <span className="hidden md:inline">Novo Projeto</span>
+          </button>
           <input type="file" className="hidden" ref={agentInputRef} onChange={(e) => { if (e.target.files?.[0]) startAutomatedAgent(e.target.files[0]); }} />
           <button 
             onClick={() => agentInputRef.current?.click()} 
@@ -508,6 +583,53 @@ export default function ProjectDashboard({ activeProjectId, onSelectProject, onS
             <Cpu className="w-5 h-5" /> 
             IA Automática
           </button>
+        </div>
+      </div>
+
+      <div className="bg-surface border border-outline rounded-3xl p-6 shadow-sm mb-8 flex flex-col md:flex-row gap-6">
+        <div className="w-full md:w-1/3 flex flex-col gap-4">
+           <h2 className="text-title-medium font-bold text-on-surface flex items-center gap-2">
+              <Activity className="w-5 h-5 text-primary" /> Recurso do Sistema 
+           </h2>
+           <div className="bg-surface-container-low border border-outline-variant rounded-2xl p-4 flex justify-between items-center">
+              <div>
+                 <p className="text-label-medium text-on-surface-variant uppercase tracking-widest font-bold">CPU Load</p>
+                 <p className="text-headline-small text-on-surface">{sysStats.cpuLoad}%</p>
+              </div>
+              <Cpu className="w-8 h-8 text-primary opacity-80" />
+           </div>
+           <div className="bg-surface-container-low border border-outline-variant rounded-2xl p-4 flex justify-between items-center">
+              <div>
+                 <p className="text-label-medium text-on-surface-variant uppercase tracking-widest font-bold">Memória RAM</p>
+                 <p className="text-headline-small text-on-surface">{sysStats.usedMem} / {sysStats.totalMem}</p>
+              </div>
+              <Database className="w-8 h-8 text-secondary opacity-80" />
+           </div>
+        </div>
+        <div className="flex-1 h-64 bg-surface-container-lowest border border-outline-variant rounded-2xl p-4 flex flex-col">
+          <h3 className="text-label-medium text-on-surface-variant uppercase tracking-widest font-bold mb-4 drop-shadow-sm">System Utilization Telemetry</h3>
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={cpuHistory} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="colorCpu" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.4}/>
+                  <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0}/>
+                </linearGradient>
+                <linearGradient id="colorMem" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4}/>
+                  <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="time" stroke="currentColor" className="text-[10px] text-on-surface-variant/50" tick={{ fill: 'currentColor', fontSize: 10 }} tickLine={false} axisLine={false} />
+              <YAxis stroke="currentColor" className="text-[10px] text-on-surface-variant/50" tick={{ fill: 'currentColor', fontSize: 10 }} tickLine={false} axisLine={false} />
+              <Tooltip 
+                contentStyle={{ backgroundColor: 'var(--md-sys-color-surface-container-highest)', border: '1px solid var(--md-sys-color-outline-variant)', borderRadius: '12px', fontSize: '12px' }}
+                itemStyle={{ color: 'var(--md-sys-color-on-surface)' }}
+              />
+              <Area type="monotone" dataKey="cpu" stroke="#0ea5e9" fillOpacity={1} fill="url(#colorCpu)" name="CPU %" isAnimationActive={false} strokeWidth={2} />
+              <Area type="monotone" dataKey="mem" stroke="#8b5cf6" fillOpacity={1} fill="url(#colorMem)" name="Mem (GB)" isAnimationActive={false} strokeWidth={2} />
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
@@ -520,6 +642,93 @@ export default function ProjectDashboard({ activeProjectId, onSelectProject, onS
             <p className="text-body-large text-on-surface-variant max-w-md">Para começar a trabalhar, inicie um novo projeto ou importe código existente usando o assistente de IA automática.</p>
         </div>
       ) : projectGrid}
+
+      <AnimatePresence>
+      {isModaling && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9, y: 20 }} 
+            animate={{ opacity: 1, scale: 1, y: 0 }} 
+            exit={{ opacity: 0, scale: 0.9, y: 20 }} 
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            className="bg-surface border border-outline rounded-3xl p-8 max-w-md w-full shadow-elevation-3"
+          >
+            <h2 className="text-headline-small text-on-surface mb-6">Novo Projeto</h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-label-large text-on-surface mb-2">Auto-Detect ROM</label>
+                <div className="flex items-center gap-2">
+                   <input type="file" id="rom-auto-detect" className="hidden" onChange={handleRomFileSelect} accept=".bin,.rom,.sfc,.smc,.iso,.cue,.gba,.z64,.n64" />
+                   <label htmlFor="rom-auto-detect" className="cursor-pointer flex-1 bg-secondary-container text-on-secondary-container p-3 rounded-xl hover:bg-secondary-container/80 transition-colors text-center font-medium shadow-sm">
+                     Selecionar ROM Base
+                   </label>
+                </div>
+                <p className="text-body-small text-on-surface-variant mt-2 text-center">Detecta o template de arquitetura via assinatura.</p>
+              </div>
+
+              <div>
+                <label className="block text-label-large text-on-surface mb-2">Nome do Projeto</label>
+                <input 
+                  type="text" 
+                  value={newProjectName} 
+                  onChange={e => setNewProjectName(e.target.value)} 
+                  className="w-full bg-surface-variant text-on-surface p-3 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Ex: Final Fantasy VI BR"
+                />
+              </div>
+
+              <div>
+                <label className="block text-label-large text-on-surface mb-2">Template de Arquitetura</label>
+                <div className="relative">
+                  <motion.select 
+                    key={platform}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+                    id="platform-select"
+                    value={platform} 
+                    onChange={e => setPlatform(e.target.value)} 
+                    className={`w-full text-on-surface p-3 rounded-xl border-none outline-none focus:ring-2 focus:ring-primary shadow-sm transition-colors ${!isCompatible && selectedFileExt ? 'bg-error-container text-on-error-container ring-1 ring-error' : 'bg-surface-variant text-on-surface'}`}
+                  >
+                    <option value="SNES">Nintendo (SNES) - 65816</option>
+                    <option value="MIPS_PS1">PlayStation 1 (MIPS R3000A)</option>
+                    <option value="M68K_Genesis">Sega Genesis (M68K)</option>
+                    <option value="GBA">Game Boy Advance (ARM7TDMI)</option>
+                    <option value="N64">Nintendo 64 (MIPS VR4300)</option>
+                    <option value="Other">Outro / Desconhecido</option>
+                  </motion.select>
+                  {!isCompatible && selectedFileExt && (
+                    <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="absolute -top-12 right-0 bg-error text-on-error text-label-small px-3 py-1.5 rounded-lg shadow-elevation-2 whitespace-nowrap pointer-events-none z-10">
+                      Incompatível com .{selectedFileExt}
+                    </motion.div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-8">
+              <button onClick={() => setIsModaling(false)} className="px-5 py-2.5 rounded-full text-on-surface-variant hover:bg-surface-variant transition-colors font-medium">Cancelar</button>
+              <div className="relative group">
+                <button 
+                  onClick={addProject} 
+                  disabled={isProcessing || !newProjectName || (!isCompatible && selectedFileExt !== '')}
+                  className="px-5 py-2.5 bg-primary text-on-primary rounded-full hover:bg-primary/90 transition-colors font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                  Criar Projeto
+                </button>
+                {(!isCompatible && selectedFileExt !== '') && (
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-surface-container-highest text-on-surface text-label-small rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">
+                    Aviso: Arquitetura incompatível com a ROM.
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {toastMsg && (

@@ -90,6 +90,23 @@ class MonitorService {
     eventBus.emit('INTEGRITY_CHECK', { projectId, crc });
   }
 
+  private resourceThresholdStartedAt: number | null = null;
+
+  public trackResourceUsage(cpuPercent: number, memPercent: number) {
+    if (cpuPercent > 85 || memPercent > 85) {
+      if (!this.resourceThresholdStartedAt) {
+        this.resourceThresholdStartedAt = Date.now();
+      } else if (Date.now() - this.resourceThresholdStartedAt > 5 * 60 * 1000) {
+        logger.warn(`[MONITOR] High resource usage detected (>85%) for over 5 minutes!`);
+        eventBus.emit('RESOURCE_THRESHOLD_EXCEEDED', { cpu: cpuPercent, mem: memPercent, durationMs: Date.now() - this.resourceThresholdStartedAt });
+        // Reset to avoid spamming every tick, wait for it to clear or another 5 min.
+        this.resourceThresholdStartedAt = Date.now(); 
+      }
+    } else {
+      this.resourceThresholdStartedAt = null; // reset if it drops below threshold
+    }
+  }
+
   public reportError(error: Error | string) {
     this.health.status = SystemStatus.DEGRADED;
     this.health.lastError = typeof error === 'string' ? error : error.message;
