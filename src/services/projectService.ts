@@ -2,6 +2,7 @@ import { persistentStorage } from "../services/indexedDBService";
 import { storage } from "../services/storageService";
 import { logger } from "../services/loggerService";
 import { eventBus } from "../services/eventBus";
+import { wsService } from "../services/websocketService";
 import { auth, db } from "./firebase";
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs, serverTimestamp, query, where } from "firebase/firestore";
 
@@ -63,6 +64,12 @@ export class ProjectService {
 
   constructor() {
     this.projects = storage.get<ProjectMetadata[]>('RF_PROJECTS') || [];
+
+    // System Monitor: Listen for ROM changes triggered by backend fs.watch
+    wsService.on("ROM_FILE_MUTATION", (data: any) => {
+      logger.log('INFO', 'projectService', `fs.watch: ROM file changed [${data.eventType}] - ${data.filename}`);
+      eventBus.emit('ROM_SYNC_DETECTED', data);
+    });
 
     auth.onAuthStateChanged(async (user) => {
       if (user) {

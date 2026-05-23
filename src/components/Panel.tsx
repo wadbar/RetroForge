@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { Activity, ShieldAlert, Cpu, Radio, Trash2, Zap, CheckCircle2, AlertTriangle, XCircle, TrendingUp, Moon, Sun } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LineChart, Line, ResponsiveContainer, YAxis, Tooltip, AreaChart, Area } from 'recharts';
-import { monitor } from '../../services/monitorService';
-import { SystemHealth, SystemStatus } from '../../core/types';
-import { eventBus } from '../../services/eventBus';
+import { monitor } from '../services/monitorService';
+import { SystemHealth, SystemStatus } from '../core/types';
+import { eventBus } from '../services/eventBus';
 
 export const Panel: React.FC = () => {
   const [health, setHealth] = useState<SystemHealth>(monitor.getHealthData());
@@ -14,9 +14,23 @@ export const Panel: React.FC = () => {
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('RF_THEME');
-    if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    
+    if (savedTheme === 'dark' || (!savedTheme && mediaQuery.matches)) {
       setIsDarkMode(true);
+    } else {
+      setIsDarkMode(false);
     }
+
+    const handleChange = (e: MediaQueryListEvent) => {
+      if (!localStorage.getItem('RF_THEME')) {
+        setIsDarkMode(e.matches);
+      }
+    };
+    
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
 
     const interval = setInterval(() => {
       const currentHealth = monitor.getHealthData();
@@ -72,7 +86,7 @@ export const Panel: React.FC = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 20 }}
-        className="bg-[var(--md-sys-color-surface-container)] border border-[var(--md-sys-color-outline-variant)] rounded-3xl p-6 md:p-8 shadow-elevation-2 overflow-hidden flex flex-col"
+        className="m3-card flex flex-col"
       >
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
           <div className="flex items-center gap-3">
@@ -91,10 +105,11 @@ export const Panel: React.FC = () => {
             </div>
             <button 
               onClick={toggleTheme}
-              className="p-3 bg-surface-variant text-on-surface-variant rounded-full hover:bg-on-surface/10 transition-colors"
+              className="m3-button-tonal flex items-center gap-2"
               aria-label="Toggle Theme"
             >
               {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              <span className="hidden sm:inline">{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
             </button>
           </div>
         </div>
@@ -132,11 +147,12 @@ export const Panel: React.FC = () => {
           <div className="flex flex-col gap-4">
             <h3 className="text-title-medium text-on-surface flex items-center justify-between">
               Recent Dispatches
-              <button className="p-2 hover:bg-surface-variant rounded-full transition-colors text-on-surface-variant hover:text-error" onClick={() => setRecentEvents([])}>
+              <button className="m3-button-tonal !px-4 !py-2 flex items-center gap-2 text-on-surface-variant hover:text-error" onClick={() => setRecentEvents([])}>
                  <Trash2 className="w-4 h-4" />
+                 <span className="text-label-large">Clear</span>
               </button>
             </h3>
-            <div className="bg-surface-container-high rounded-3xl p-4 border border-outline-variant flex-1 min-h-[140px] flex flex-col gap-2">
+            <div className="m3-card !bg-surface-container-high !p-4 flex-1 min-h-[140px] flex flex-col gap-2">
                <AnimatePresence>
                  {recentEvents.length === 0 && <span className="text-body-medium text-on-surface-variant p-2">Monitoring bus traffic...</span>}
                  {recentEvents.map((ev, i) => (
@@ -144,7 +160,7 @@ export const Panel: React.FC = () => {
                      key={i + ev.time}
                      initial={{ opacity: 0, x: -10 }}
                      animate={{ opacity: 1, x: 0 }}
-                     className="flex justify-between items-center bg-surface p-3 rounded-2xl border-l-4 border-primary shadow-sm"
+                     className="flex justify-between items-center bg-surface p-3 rounded-[16px] border-l-4 border-primary shadow-sm"
                    >
                      <span className="text-label-large font-medium text-on-surface">{ev.name}</span>
                      <span className="text-label-medium text-on-surface-variant">{ev.time}</span>
@@ -155,7 +171,7 @@ export const Panel: React.FC = () => {
           </div>
         </div>
 
-        <div className="h-[200px] w-full bg-surface-container-high rounded-3xl border border-outline-variant overflow-hidden p-6 relative">
+        <div className="h-[200px] w-full m3-card !bg-surface-container-high overflow-hidden relative !p-6">
           <div className="flex items-center gap-2 mb-4 text-label-large text-on-surface font-medium">
             <TrendingUp className="w-4 h-4 text-primary" />
             Latency Pulse (ms)
@@ -214,7 +230,7 @@ const ServiceIndicator = ({ name, status }: { name: string, status: SystemStatus
   };
 
   return (
-    <div className="bg-surface-container-high border border-outline-variant rounded-2xl p-4 flex items-center justify-between hover:shadow-elevation-1 transition-shadow">
+    <div className="m3-card !bg-surface-container-high !p-4 flex items-center justify-between">
       <span className="text-label-large text-on-surface font-medium">{name}</span>
       {getIcon()}
     </div>
@@ -222,7 +238,7 @@ const ServiceIndicator = ({ name, status }: { name: string, status: SystemStatus
 };
 
 const StatCard = ({ icon, label, value, color = "text-on-surface" }: { icon: React.ReactNode, label: string, value: string, color?: string }) => (
-  <div className="bg-surface-container-high border border-outline-variant rounded-3xl p-6 flex flex-col gap-3 hover:shadow-elevation-1 transition-all">
+  <div className="m3-card !bg-surface-container-high flex flex-col gap-3">
     <div className="flex items-center gap-3">
       {icon}
       <span className="text-label-medium text-on-surface-variant font-bold uppercase tracking-wider">{label}</span>

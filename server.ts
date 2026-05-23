@@ -106,6 +106,8 @@ class InfrastructureDaemon {
       logger.log(LogLevel.INFO, "InfrastructureDaemon", "No REDIS_URL provided. Executing WebSockets in standalone mode.");
     }
 
+    this.startRomWatcher();
+
     this.io.on("connection", (socket: Socket) => {
       logger.log(LogLevel.DEBUG, "WebSocket", `Collaborative node attached: ${socket.id}`);
 
@@ -122,6 +124,26 @@ class InfrastructureDaemon {
         socket.removeAllListeners();
       });
     });
+  }
+
+  private startRomWatcher() {
+    try {
+      const fs = require('fs');
+      const romsDir = path.join(process.cwd(), 'roms');
+      if (!fs.existsSync(romsDir)) {
+        fs.mkdirSync(romsDir, { recursive: true });
+      }
+      
+      fs.watch(romsDir, (eventType: string, filename: string) => {
+        if (filename && filename.match(/\.(rom|sfc|bin|iso|cue)$/i)) {
+           logger.log(LogLevel.INFO, "InfrastructureDaemon", `ROM file mutation detected: ${filename} (${eventType})`);
+           this.io.emit("ROM_FILE_MUTATION", { filename, eventType, timestamp: Date.now() });
+        }
+      });
+      logger.log(LogLevel.INFO, "InfrastructureDaemon", "Native fs.watch activated for ROM directory.");
+    } catch (e: any) {
+      logger.log(LogLevel.WARN, "InfrastructureDaemon", "Could not initialize fs.watch for roms directory", { error: e.message });
+    }
   }
 
   private async setupViteMiddleware(): Promise<void> {
