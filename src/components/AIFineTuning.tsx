@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrainCircuit, UploadCloud, Database, Code, ShieldCheck, Sparkles, AlertTriangle, Cpu, FileText, Code2, X, Users } from 'lucide-react';
+import { BrainCircuit, UploadCloud, Database, Code, ShieldCheck, Sparkles, AlertTriangle, Cpu, FileText, Code2, X, Users, ChevronUp, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 import { wsService } from '../services/websocketService';
@@ -331,6 +331,29 @@ def retroforge_auto_mod(hex_buffer, offset, user_intent):
     setIsTraining(false);
   };
 
+  const [sortConfig, setSortConfig] = useState<{key: string, direction: 'asc'|'desc'} | null>(null);
+
+  const sortedKnowledgeBase = [...knowledgeBase].sort((a, b) => {
+    if (!sortConfig) return 0;
+    const { key, direction } = sortConfig;
+    let valA = a[key as keyof typeof a];
+    let valB = b[key as keyof typeof b];
+    if (valA === undefined) valA = '';
+    if (valB === undefined) valB = '';
+    
+    if (valA < valB) return direction === 'asc' ? -1 : 1;
+    if (valA > valB) return direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const handleSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-10">
       <div className="flex flex-col gap-4">
@@ -398,12 +421,16 @@ def retroforge_auto_mod(hex_buffer, offset, user_intent):
 
           <div className="flex-1 border border-outline-variant rounded-[24px] overflow-hidden bg-surface">
             <div className="grid grid-cols-12 gap-4 p-4 border-b border-outline-variant text-label-small font-medium text-on-surface-variant uppercase tracking-wider bg-surface-container-high">
-              <div className="col-span-6">Arquivo / Fonte</div>
-              <div className="col-span-4">Tipo</div>
-              <div className="col-span-2 text-right">Tamanho</div>
+              <button onClick={() => handleSort('name')} className="col-span-6 flex items-center gap-1 hover:text-primary transition-colors disabled:opacity-50 text-left">
+                Arquivo / Fonte {sortConfig?.key === 'name' ? (sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4"/> : <ChevronDown className="w-4 h-4"/>) : <div className="w-4 h-4" />}
+              </button>
+              <button onClick={() => handleSort('type')} className="col-span-4 flex items-center gap-1 hover:text-primary transition-colors disabled:opacity-50 text-left">
+                Tipo {sortConfig?.key === 'type' ? (sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4"/> : <ChevronDown className="w-4 h-4"/>) : <div className="w-4 h-4" />}
+              </button>
+              <div className="col-span-2 text-right px-2">Tamanho</div>
             </div>
             <div className="max-h-64 overflow-y-auto custom-scrollbar p-2 space-y-2">
-              {knowledgeBase.map((item, i) => (
+              {sortedKnowledgeBase.map((item, i) => (
                 <div key={i} onClick={() => openDoc(item)} className="grid grid-cols-12 gap-4 p-3 rounded-xl hover:bg-surface-container-high transition-colors text-body-medium border border-transparent hover:border-outline-variant cursor-pointer group">
                   <div className="col-span-6 flex items-center gap-3 text-on-surface">
                     <Code className="w-5 h-5 text-on-surface-variant" />
