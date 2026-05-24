@@ -5,11 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "build": "npm run clean && vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "build:sdk": "esbuild src/core/index.ts src/services/index.ts --bundle --platform=neutral --format=esm --outdir=dist/sdk",
-    "start": "node dist/server.cjs",
-    "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "start": "NODE_ENV=production node dist/server.cjs",
+    "clean": "rm -rf dist node_modules/.vite",
+    "clean:all": "rm -rf dist node_modules package-lock.json",
+    "lint": "tsc --noEmit",
+    "update:sys": "npm update --save"
   },
   "dependencies": {
     "@firebase/eslint-plugin-security-rules": "^0.0.2",
@@ -19,11 +21,14 @@
     "@tailwindcss/vite": "^4.1.14",
     "@types/d3": "^7.4.3",
     "@vitejs/plugin-react": "^5.0.4",
+    "compression": "^1.8.1",
     "d3": "^7.9.0",
     "dotenv": "^17.2.3",
     "esbuild": "^0.28.0",
     "express": "^4.21.2",
+    "express-rate-limit": "^8.5.2",
     "firebase": "^12.13.0",
+    "helmet": "^8.2.0",
     "ioredis": "^5.10.1",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
@@ -37,6 +42,7 @@
     "vite": "^6.2.3"
   },
   "devDependencies": {
+    "@types/compression": "^1.8.1",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",

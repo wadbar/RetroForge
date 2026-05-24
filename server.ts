@@ -5,6 +5,9 @@ import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import crypto from "crypto";
 import http from "http";
+import compression from "compression";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import { Server as SocketIOServer, Socket } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
 import Redis from "ioredis";
@@ -156,17 +159,62 @@ class InfrastructureDaemon {
       logger.log(LogLevel.INFO, "InfrastructureDaemon", "Vite Development Middleware hooked.");
     } else {
       const distPath = path.join(process.cwd(), "dist");
-      this.app.use(express.static(distPath));
+      // Extreme optimization for static downloads: Max caching & Immutable chunks
+      this.app.use(express.static(distPath, {
+        maxAge: '1y',
+        immutable: true,
+        etag: true,
+        lastModified: true,
+      }));
       this.app.get("*", (req: Request, res: Response) => {
+        // Provide standard SPA fallback but do not aggressively cache the entry index.html
+        res.setHeader('Cache-Control', 'no-cache');
         res.sendFile(path.join(distPath, "index.html"));
       });
-      logger.log(LogLevel.INFO, "InfrastructureDaemon", "Production Static File Routing enabled.");
+      logger.log(LogLevel.INFO, "InfrastructureDaemon", "Production Static File Routing & Content Delivery Optimization enabled.");
     }
   }
 
   private bindMiddlewares(): void {
-    this.app.use(express.json({ limit: "5mb" }));
-    
+    // Supreme optimizations
+    // Trust proxy for reverse proxies (like Cloud Run / NGINX)
+    this.app.set("trust proxy", true);
+
+    this.app.use(helmet({ contentSecurityPolicy: false })); // Basic security headers, disabling CSP for Dev HMR compat
+    this.app.use(compression({ level: 9 })); // Max compression level for extreme bandwidth optimization
+    this.app.use(express.json({ limit: "50mb" })); // Increased payload limit
+    this.app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+
+    // Global Rate Limiting - Advanced
+    const limiter = rateLimit({
+      windowMs: 60 * 1000, // 1 minute
+      max: 500, // limit each IP to 500 requests per windowMs
+      message: "Too many requests from this IP, please try again after a minute",
+      standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+      legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+      keyGenerator: (req) => {
+        const forwarded = req.headers['forwarded'];
+        if (forwarded) {
+          const match = forwarded.match(/for="?([^";,]+)"?/);
+          if (match) return match[1];
+        }
+        const xForwardedFor = req.headers['x-forwarded-for'];
+        if (xForwardedFor) {
+           return (typeof xForwardedFor === 'string' ? xForwardedFor : xForwardedFor[0]).split(',')[0].trim();
+        }
+        return req.ip || req.socket.remoteAddress || "unknown";
+      },
+      validate: {
+        xForwardedForHeader: false, // Disable the X-Forwarded-For warning if trust proxy handles it
+        default: true
+      }
+    });
+    this.app.use("/api/", limiter);
+
+    // Optimize Server Keep-Alive Networking
+    this.server.keepAliveTimeout = 65000;
+    this.server.headersTimeout = 66000;
+
     // Telemetry middleware
     this.app.use((req: Request, res: Response, next: NextFunction) => {
       const start = Date.now();

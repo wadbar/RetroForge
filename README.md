@@ -1,92 +1,114 @@
-# RETROFORGE AI: The Supreme Binary Engineering Ecosystem
+# RETROFORGE AI: Supreme Engineering Architecture Wiki
 
 <div align="center">
-  <h3><strong>AI-Powered Reverse Engineering & Binary Modding at Industrial Scale</strong></h3>
-  <br>
+  <h2><strong>A Pinnacle in Distributed Systems & AI Reverse Engineering</strong></h2>
 </div>
 
-**RetroForge AI** redefines the paradigm of binary manipulation. It fuses classic reverse engineering capabilities with next-generation Artificial Intelligence, forming an unyielding, memory-safe, and self-healing engine capable of parsing, decompiling, and modifying legacy architectures (MIPS, ARM, x86, M68K). 
+RetroForge AI is far beyond a simple web app. It is a **Highly Available, Resilient, AI-Orchestrated System** that leverages advanced infrastructure principles to deliver uninterrupted parsing, recompilation, and binary modification at an industrial scale. 
 
-Designed under the **Omni-Engineer v2.0-ULTIMATE Protocol**, this platform implements high-performance multi-threading, self-healing circuits, telemetry, and zero-trust data safety.
-
----
-
-## 🌌 Infinite Evolution Architecture (The Creator)
-
-RetroForge uses a rigorous **Clean Architecture** to separate domains, ensuring absolute decoupling between logic and UI.
-
-### Architectural Diagram (Conceptual)
-```mermaid
-graph TD;
-    UI[Tier 4: UI/React Dapp] -->|EventBus| Intelligence[Tier 2: AI / Orchestrators];
-    UI -->|UseCases| Logic[Tier 1: Core Logic & UseCases];
-    Intelligence --> Logic;
-    Logic --> Foundation[Tier 0: Persistence / Workers];
-    Intelligence --> |API Keys| LLM[Google Gemini Vertex API];
-    Foundation --> IDB[(IndexedDB Blob Store)];
-    
-    SelfHealing[Tier 3: Self-Healing / Monitor] -.->|Observes| Intelligence;
-    SelfHealing -.->|Observes| Logic;
-```
-
-### 🏢 System Tiers
-- **Tier 0 (Foundation)**: Persistent Blob Storage (up to 1GB binaries), WebWorker Thread Pools, LRU Caching mechanisms.
-- **Tier 1 (Core Logic)**: Functional manipulation of binary streams. `ApplyPatchUseCase`, `ScannerUseCase`, `BinaryIntegrityUseCase`.
-- **Tier 2 (Intelligence)**: Stateful orchestrators. The `aiDecompilerService` acts as a multi-model proxy with circuit-breakers and exponential backoff.
-- **Tier 3 (Guardian)**: `MonitorService` and `SelfHealingService`. Calculates EMA (Exponential Moving Average) error rates, actively resetting sub-systems during critical failures without human intervention.
-- **Tier 4 (Presentation)**: Real-time telemetry dashboards and Modding Hubs, built dynamically with Tailwind, Lucide, and Recharts.
+This README serves as the **Supreme Wiki & Blueprint** for understanding every byte of its architecture, optimization routines, and deployment cycles.
 
 ---
 
-## ⚡ Extreme Optimization (The Optimizer)
+## 🏛️ 1. Theoretical Architecture (V9 Nexus)
 
-- **Portable SDK Engine**: The core logic (`src/core/`) and infrastructure (`src/services/`) compile directly into raw ESM via `build:sdk` for cross-platform integration (Electron, Rust, CLI).
-- **Asynchronous WebWorkers**: Intensive pattern scanning is pushed to background threads, guaranteeing 60FPS UI rendering even during 50MB binary iterations.
-- **Heuristic Symbol Detection**: The `ScannerUseCase` integrates logic to rapidly isolate strings, byte signatures, and function boundaries.
+The platform is engineered around the **Omni-Engineer v2.0-ULTIMATE Protocol**. In simple terms, it is:
+1. **Event-Driven**: Complete decoupling of layers via `eventBus.ts`.
+2. **Stateless (at the edge)**: `InfrastructureDaemon` serves HTTP layers immutably.
+3. **Resilient**: Implements auto-healing, exponential backoff, and timeouts for LLMs and Redis.
 
----
-
-## 🛡️ Industrial Security & Resilience (The Guardian)
-
-- **Circuit Breakers**: External API integrations are shielded by a robust `CircuitBreaker`. It detects rate limits (429) & timeouts, opening the circuit to prevent cascading system failures.
-- **Automated Snapshots**: Zero-data-loss guarantee. Any destructive write operation creates an automatic history snapshot.
-- **CRC32 Integrity**: Memory is continually validated against CRC32 checksums, terminating operations if corruption is detected.
-- **Graceful Degradation**: Application components gracefully fall back to alternative AI models or manual hex-editing when external streams fail.
-
----
-
-## 🏭 Production Ecosystem (The CTO)
-
-We deliver absolute CI/CD readiness.
-- **Docker Ready**: A minimal, multi-stage, non-root Alpine Dockerfile ensures the deployment size is microscopic and highly secure.
-- **Docker Swarm / K8s**: `docker-compose.yml` provides a production-ready network configuration with Healthchecks and limits.
-- **CI/CD Action**: `.github/workflows/ci.yml` validates code quality (linters), dependencies, builds the runtime and portable SDK, and mocks Snyk/Trivy pipelines.
-- **Telemetry**: `loggerService.ts` mimics Winston/Log4j formats for easy parsing by ELK/Datadog stacks.
+### Architectural Tiers Breakdown
+- **Tier 0 (Hardware / Memory)**: Redis Pub/Sub, Node.js V8 GC-Optimized buffers, and LocalStorage/IndexedDB.
+- **Tier 1 (Core Matrix)**: Functional manipulators within `/src/core`. They only do one thing, pure functions, zero side effects.
+- **Tier 2 (AI Intelligence Hub)**: The `ResilientAiCore`. A supreme multi-agent routing algorithm. It balances load across Gemini, Ollama, and Nvidia NIM with integrated Circuit Breakers and Fallbacks.
+- **Tier 3 (Guardian Layer)**: Telemetry loggers (`loggerService`) and Active Monitors (`monitorService`) observing CPU thresholds, latency, and cache misses.
+- **Tier 4 (React/Vite Engine)**: A meticulously handcrafted Tailwind UI consuming standard WebSockets for reactive, jitter-free rendering.
 
 ---
 
-## 🚀 Quickstart & Pipeline
+## ⚡ 2. Extreme Optimization Engineering
 
-### Developer Setup
+We have extracted every millisecond of performance out of the Node.js V8 engine and the network stack.
+
+### Backend Optimizations
+- **Compression Level 9**: All outgoing HTTP responses are compressed at the maximum possible algorithm depth (`compression({ level: 9 })`).
+- **Zero-Copy Static Delivery**: Vite builds the frontend to static immutable chunks, and Express delivers them with 1-year max-age caching policies (`maxAge: '1y', immutable: true`).
+- **HTTP/Keep-Alive Maximation**: Node.js `keepAliveTimeout` explicitly set to 65s to prevent cloud-proxy racing (AWS/GCP optimal defaults), preventing costly TCP handshakes on every request.
+- **Garbage Collection Deferral**: Subsystems like `CacheEngine` implement active LRU manual sweeps periodically `setInterval(...).unref()`, allowing the master Thread to ignore it until necessary.
+
+### Frontend Optimizations
+- **Debounced Reactivity**: High-frequency metrics (health data) are pooled and drawn using selective render arrays.
+- **Motion UI Virtualization**: Tailwind + Motion handle GPU-accelerated transforms without triggering reflows.
+
+---
+
+## 🛡️ 3. Security & Stability (Guardian Subsystems)
+
+Security is not an afterthought; it is embedded into the core daemon.
+
+- **Helmet Header Injector**: Protects against clickjacking, XSS, and MIME sniffing automatically.
+- **Dynamic Rate Limiter**: A heavy-duty memory buffer dropping IPs that exceed 500 requests/minute to prevent DDoS or API quota drains.
+- **Payload Strictness**: Symmetrical `express.json({ limit: "50mb" })` protects the memory heap while allowing large binary streams.
+- **Graceful Takedown**: Advanced `SIGINT/SIGTERM` listening ensures all Redis sockets and WebSocket queues flush to disk safely before Node exits.
+
+---
+
+## 🤖 4. The Multi-Model AI Router (ResilientAiCore)
+
+The core is programmed to NEVER fail.
+- **Primary Attack Vector**: `Gemini 2.5 Flash` (Fastest, integrated native context).
+- **Secondary (Performance/Math) Vector**: `Nvidia NIM Llama 3.1 405b`.
+- **Tertiary (Offline) Vector**: Local `Ollama Qwen2.5-Coder` instance.
+
+> **The Try-Catch-Race Pattern**: Every request uses `Promise.race[]` with an `AbortController`. If Gemini stalls for 25 seconds, the sequence kills the TCP connection instantly to prevent ghost-connections and retries with an Exponential Backoff strategy (`500ms * 2^attempt`).
+
+---
+
+## 🚀 5. Supreme Pipeline & Lifecycle Manager
+
+RetroForge includes heavily optimized `npm run` lifecycles ensuring clean deployment matrices.
+
+### The Scripts
+- `npm run dev`: Boots the entire TypeScript Node + Vite middleware via `tsx`. Instant HMR routing where available.
+- `npm run build`: Flushes previous distributions (`clean`), bundles the frontend SPA, and uses `esbuild` to compile a single server binary (`server.cjs`) dropping the `.vite` cache.
+- `npm run clean:all`: The scorched-earth cleanup routine. Destroys all dependencies and locks to prepare for a pristine reinstall.
+- `npm run update:sys`: Bumps all `package.json` payloads safely.
+
+### Full Installation Flow (From Zero to Production)
 ```bash
-# 1. Install dependencies
-npm ci
+# 1. Extreme Clean Slate Installation
+git clone <repo> retroforge
+cd retroforge
+npm run clean:all
+npm install
 
-# 2. Start Full-Stack Engine (Vite + Express in one command)
-npm run dev
+# 2. Configure Environment (Copy .env.example)
+cp .env.example .env
+# Edit .env with your GEMINI_API_KEY, REDIS_URL, etc.
 
-# 3. Build the Portable SDK for remote integrations
-npm run build:sdk
-
-# 4. Standard App Build
+# 3. Compile the Production Payload
 npm run build
-```
 
-### Docker Deployment
-```bash
-# Build & Spin up RetroForge App on port 3000
-docker-compose up -d --build
+# 4. Initiate the Supreme Daemon
+npm run start
 ```
 
 ---
-*Built autonomously by Supreme Omni-Engineer v2.0.*
+
+## ⚙️ 6. System Configuration Keys (The .env Standard)
+
+To unlock the maximum potential, ensure these are configured:
+* `GEMINI_API_KEY`: Primary Brain (Required).
+* `REDIS_URL`: Enables Multi-Node clustering across the world.
+* `NVIDIA_API_KEY`: Fallback super-compute cluster.
+* `OLLAMA_HOST`: For extreme air-gapped environments.
+
+---
+
+## 🏗️ 7. Development Guidelines & Contributing
+
+- **The Golden Rule**: NEVER REMOVE A FEATURE. RetroForge only expanses. Optimize existing logic, refactor structurally, but retain all functional user paths.
+- **Component Standard**: Strict Tailwind spacing (M3 design system). Use `.m3-button-filled`, `.m3-input`.
+- **Logs**: Do not use raw `console.log` for business paths. Use `logger.log(LogLevel.INFO, 'Ctx', 'msg')` so telemetry can pick it up.
+
+> *Architected by the Industrial Code Compiler AI. Immutable perfection.*

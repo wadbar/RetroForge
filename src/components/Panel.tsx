@@ -1,10 +1,11 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { Activity, ShieldAlert, Cpu, Radio, Trash2, Zap, CheckCircle2, AlertTriangle, XCircle, TrendingUp, Moon, Sun } from 'lucide-react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { Activity, ShieldAlert, Cpu, Radio, Trash2, Zap, CheckCircle2, AlertTriangle, XCircle, TrendingUp, Moon, Sun, Search, Loader2, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LineChart, Line, ResponsiveContainer, YAxis, Tooltip, AreaChart, Area } from 'recharts';
 import { monitor } from '../services/monitorService';
 import { SystemHealth, SystemStatus } from '../core/types';
 import { eventBus } from '../services/eventBus';
+import { debounce } from '../utils/debounce';
 
 export const Panel: React.FC = () => {
   const [health, setHealth] = useState<SystemHealth>(monitor.getHealthData());
@@ -19,6 +20,98 @@ export const Panel: React.FC = () => {
   const [newPresetName, setNewPresetName] = useState('');
   const [newPresetPayload, setNewPresetPayload] = useState('');
   const [presetError, setPresetError] = useState('');
+
+  // --- Binary Hex Inspector Search ---
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<number[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isRegexMode, setIsRegexMode] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [hoveredByte, setHoveredByte] = useState<number | null>(null);
+  const workerRef = useRef<Worker | null>(null);
+
+  const hexData = React.useMemo(() => {
+    const data = new Uint8Array(1024);
+    for (let i = 0; i < 1024; i++) data[i] = i % 256;
+    return data;
+  }, []);
+
+  useEffect(() => {
+    workerRef.current = new Worker(new URL('../core/workers/fuzzy.worker.ts', import.meta.url), { type: 'module' });
+    workerRef.current.onmessage = (e) => {
+      setIsSearching(false);
+      if (e.data.type === 'SUCCESS') {
+        setSearchResults(e.data.results);
+      }
+    };
+    return () => {
+      workerRef.current?.terminate();
+    };
+  }, []);
+
+  const runSearch = useCallback((query: string, regexMode: boolean) => {
+    if (!query) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+    setIsSearching(true);
+    workerRef.current?.postMessage({ query, data: hexData, isRegex: regexMode });
+    
+    setSearchHistory(prev => {
+      const history = [query, ...prev.filter(q => q !== query)].slice(0, 10);
+      return history;
+    });
+  }, [hexData]);
+
+  const debouncedSearch = React.useMemo(() => debounce(runSearch, 300), [runSearch]);
+
+  const handleSearchChange = (val: string, rMode = isRegexMode) => {
+    setSearchQuery(val);
+    if (!val) {
+      setSearchResults([]);
+      setIsSearching(false);
+    } else {
+      setIsSearching(true);
+      debouncedSearch(val, rMode);
+    }
+  };
+
+  const toggleRegexMode = () => {
+    const newMode = !isRegexMode;
+    setIsRegexMode(newMode);
+    if (searchQuery) {
+      setIsSearching(true);
+      debouncedSearch(searchQuery, newMode);
+    }
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    setSearchResults([]);
+    setIsSearching(false);
+  };
+  // -----------------------------------
+
+  const handlePayloadChange = useCallback((val: string) => {
+    setNewPresetPayload(val);
+    if (!val) {
+      setPresetError('');
+      return;
+    }
+    // Debounce the error checking to minimize UI blockage
+    debouncedPayloadCheck(val);
+  }, []);
+
+  const runPayloadCheck = useCallback((val: string) => {
+    if (!/^[0-9A-Fa-f\s]+$/.test(val)) {
+      setPresetError('Payload inválido: Use apenas caracteres hexadecimais e espaços.');
+    } else {
+      setPresetError('');
+    }
+  }, []);
+
+  const debouncedPayloadCheck = React.useMemo(() => debounce(runPayloadCheck, 300), [runPayloadCheck]);
 
   useEffect(() => {
     const savedPresets = localStorage.getItem('RF_MOD_PRESETS');
@@ -289,6 +382,130 @@ export const Panel: React.FC = () => {
           </div>
         )}
 
+         <div className="mt-8 m3-card !bg-surface-container-high !p-6 flex flex-col gap-4 relative overflow-hidden">
+          <div className="flex gap-2 text-title-medium text-on-surface z-10 flex-col">
+            <div className="flex items-center gap-2">
+              <Search className="w-5 h-5 text-primary" />
+              Binary Hex Inspector Search
+            </div>
+            {searchHistory.length > 0 && (
+               <div className="flex gap-2 overflow-x-auto no-scrollbar w-full mt-2 z-10">
+                 {searchHistory.map((hist, idx) => (
+                   <span 
+                     key={idx} 
+                     onClick={() => handleSearchChange(hist)}
+                     className="text-[10px] cursor-pointer bg-surface hover:bg-surface-variant text-on-surface-variant font-mono px-2 py-0.5 rounded border border-outline-variant whitespace-nowrap"
+                   >
+                     {hist}
+                   </span>
+                 ))}
+               </div>
+            )}
+          </div>
+          <p className="text-body-medium text-on-surface-variant z-10">Busca fuzzy assíncrona off-thread usando Web Worker e heurísticas Hex (ex: 24 ?? ?? 80).</p>
+
+          <AnimatePresence>
+            {isSearching && (
+              <motion.div 
+                initial={{ x: '-100%' }}
+                animate={{ x: '100%' }}
+                transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+                className="absolute top-0 left-0 bottom-0 w-1/3 bg-primary/5 blur-xl pointer-events-none"
+              />
+            )}
+          </AnimatePresence>
+
+          <div className="flex flex-col sm:flex-row items-center gap-3 bg-surface border border-outline-variant rounded-full px-4 py-1.5 z-10 relative overflow-hidden">
+             <Search className="w-4 h-4 text-on-surface-variant" />
+             <button 
+               onClick={toggleRegexMode}
+               className={`px-2 py-0.5 rounded text-[10px] font-bold ${isRegexMode ? 'bg-primary text-on-primary' : 'bg-surface-variant text-on-surface-variant'} transition-colors`}
+               title="Toggle Regex Mode"
+             >
+               .*
+             </button>
+             <input 
+               type="text" 
+               placeholder={isRegexMode ? "Regex Search (e.g. EA.+00)" : "Binary Payload Fuzzy Search (e.g. EA ?? 00)"}
+               className={`flex-1 bg-transparent border-none outline-none text-body-medium text-on-surface font-mono ${isRegexMode ? '' : 'uppercase'}`}
+               value={searchQuery}
+               onChange={e => handleSearchChange(e.target.value)}
+             />
+             {searchQuery && (
+               <button 
+                 onClick={clearSearch} 
+                 className="p-1 hover:bg-surface-variant rounded-full text-on-surface-variant transition-colors"
+                 disabled={isSearching}
+               >
+                 <X className="w-4 h-4" />
+               </button>
+             )}
+             <div className="flex items-center gap-3">
+               {isSearching && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
+               {searchResults.length > 0 && (
+                 <span className="text-label-medium text-primary font-bold">
+                   {searchResults.length > 50 ? '50+ Match(es)' : `${searchResults.length} Match(es)`}
+                 </span>
+               )}
+             </div>
+
+             {isSearching && (
+              <div className="h-0.5 w-full bg-surface-variant overflow-hidden absolute bottom-0 left-0">
+                <motion.div 
+                   className="h-full bg-primary"
+                   initial={{ x: '-100%' }}
+                   animate={{ x: '100%' }}
+                   transition={{ repeat: Infinity, duration: 1.5, ease: 'easeInOut' }}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="flex-1 overflow-visible custom-scrollbar flex flex-col border border-outline-variant bg-surface-container-low rounded-2xl p-4 mt-4 h-48 relative">
+             <div className="grid grid-cols-16 gap-1 flex-1 relative">
+                {Array.from({ length: 128 }).map((_, i) => {
+                  const hex = hexData[i].toString(16).padStart(2, '0').toUpperCase();
+                  const isSearchResult = searchResults.some(res => {
+                    const matchLen = isRegexMode ? 1 : Math.max(1, Math.floor(searchQuery.replace(/\s+/g, '').length / 2));
+                    return i >= res && i < res + matchLen;
+                  });
+                  let classes = "text-center cursor-crosshair rounded font-mono text-body-medium transition-all duration-300 relative group ";
+                  if (isSearchResult) {
+                     classes += "bg-tertiary text-on-tertiary font-bold shadow-[0_0_8px_var(--md-sys-color-tertiary)] ";
+                  } else {
+                     classes += "text-primary hover:bg-primary/20 ";
+                  }
+                  return (
+                    <span 
+                      key={i} 
+                      className={classes}
+                      onMouseOver={() => setHoveredByte(i)}
+                      onMouseOut={() => setHoveredByte(null)}
+                    >
+                      {hex}
+                    </span>
+                  );
+                })}
+             </div>
+             {hoveredByte !== null && hoveredByte < hexData.length - 3 && (
+               <div 
+                 className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-3 bg-inverse-surface text-inverse-on-surface rounded shadow-lg text-xs font-mono z-50 pointer-events-none grid grid-cols-2 gap-4 border border-outline-variant"
+               >
+                 <div>
+                   <div className="text-[9px] text-on-surface-variant font-bold uppercase mb-1">16-bit</div>
+                   <div>LE: {new DataView(hexData.buffer).getInt16(hoveredByte, true)}</div>
+                   <div>BE: {new DataView(hexData.buffer).getInt16(hoveredByte, false)}</div>
+                 </div>
+                 <div>
+                   <div className="text-[9px] text-on-surface-variant font-bold uppercase mb-1">32-bit</div>
+                   <div>LE: {new DataView(hexData.buffer).getInt32(hoveredByte, true)}</div>
+                   <div>BE: {new DataView(hexData.buffer).getInt32(hoveredByte, false)}</div>
+                 </div>
+               </div>
+             )}
+          </div>
+        </div>
+
         <div className="mt-8 m3-card !bg-surface-container-high !p-6 flex flex-col gap-4">
           <div className="flex items-center gap-2 text-title-medium text-on-surface">
             <Radio className="w-5 h-5 text-primary" />
@@ -309,15 +526,7 @@ export const Panel: React.FC = () => {
                placeholder="Payload (apenas Hex e espaços)" 
                className="m3-input flex-1"
                value={newPresetPayload}
-               onChange={e => {
-                 const val = e.target.value;
-                 setNewPresetPayload(val);
-                 if (val && !/^[0-9A-Fa-f\s]+$/.test(val)) {
-                   setPresetError('Payload inválido: Use apenas caracteres hexadecimais e espaços.');
-                 } else {
-                   setPresetError('');
-                 }
-               }}
+               onChange={e => handlePayloadChange(e.target.value)}
              />
              <button 
                onClick={savePreset}

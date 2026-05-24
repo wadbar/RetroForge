@@ -140,76 +140,117 @@ export class ResilientAiCore {
   /**
    * Implementação Google Gemini (Cloud)
    */
-  private static async tryGemini(prompt: string, system: string, temp: number, start: number): Promise<Partial<AIResult>> {
+  private static async tryGemini(prompt: string, system: string, temp: number, start: number, retries = 2): Promise<Partial<AIResult>> {
     const apiKey = process.env.GEMINI_API_KEY;
-    const modelName = process.env.GEMINI_MODEL || 'gemini-1.5-pro';
+    const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
     if (!apiKey) throw new Error('API_KEY_MISSING');
 
     console.log(`[AI-CORE-LEVEL-2] Tentando Google Gemini com modelo ${modelName}...`);
+    
+    let lastError = null;
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const genAI = new GoogleGenAI({ apiKey: apiKey });
+        // Implementing simple abort controller logic wrapper for Gemini via promise race
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s timeout
+        
+        const resultPromise = genAI.models.generateContent({
+          model: modelName,
+          contents: prompt,
+          config: {
+            systemInstruction: system,
+            temperature: temp
+          }
+        });
+        
+        const abortPromise = new Promise((_, reject) => {
+          controller.signal.addEventListener('abort', () => reject(new Error('GEMINI_TIMEOUT_ABORT')));
+        });
+        
+        const result: any = await Promise.race([resultPromise, abortPromise]);
+        clearTimeout(timeoutId);
 
-    const genAI = new GoogleGenAI({ apiKey: apiKey });
-    const result = await genAI.models.generateContent({
-      model: modelName,
-      contents: prompt,
-      config: {
-        systemInstruction: system,
-        temperature: temp
+        const text = result.text;
+        if (!text) throw new Error('EMPTY_RESPONSE');
+
+        return {
+          success: true,
+          provider: 'gemini',
+          model: modelName,
+          content: text,
+          latencyMs: Date.now() - start
+        };
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[AI-CORE-RETRY] Gemini Falhou na tentativa ${attempt}. ${err.message}`);
+        if (attempt < retries) {
+          await new Promise(res => setTimeout(res, 500 * Math.pow(2, attempt))); // Exponential backoff
+        }
       }
-    });
-
-    const text = result.text;
-
-    if (!text) throw new Error('EMPTY_RESPONSE');
-
-    return {
-      success: true,
-      provider: 'gemini',
-      model: modelName,
-      content: text,
-      latencyMs: Date.now() - start
-    };
+    }
+    throw lastError;
   }
 
   /**
    * Implementação NVIDIA NIM (Performance)
    */
-  private static async tryNvidia(prompt: string, system: string, temp: number, start: number): Promise<Partial<AIResult>> {
+  private static async tryNvidia(prompt: string, system: string, temp: number, start: number, retries = 2): Promise<Partial<AIResult>> {
     const apiKey = process.env.NVIDIA_API_KEY;
-    const model = process.env.NVIDIA_MODEL || 'meta/llama-3.1-70b-instruct';
+    const model = process.env.NVIDIA_MODEL || 'meta/llama-3.1-405b-instruct';
     const baseUrl = process.env.NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1';
 
     if (!apiKey) throw new Error('API_KEY_MISSING');
 
     console.log(`[AI-CORE-LEVEL-3] Tentando NVIDIA NIM com modelo ${model}...`);
 
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: prompt }
-        ],
-        temperature: temp,
-        max_tokens: 4096
-      })
-    });
+    let lastError = null;
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 20000); // 20s timeout
 
-    if (!response.ok) throw new Error(`HTTP_${response.status}`);
+      try {
+        const response = await fetch(`${baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: prompt }
+            ],
+            temperature: temp,
+            max_tokens: 4096
+          }),
+          signal: controller.signal
+        });
 
-    const data = await response.json();
-    return {
-      success: true,
-      provider: 'nvidia',
-      model,
-      content: data.choices[0].message.content,
-      latencyMs: Date.now() - start
-    };
+        clearTimeout(timeout);
+
+        if (!response.ok) throw new Error(`HTTP_${response.status}`);
+
+        const data = await response.json();
+        return {
+          success: true,
+          provider: 'nvidia',
+          model,
+          content: data.choices[0].message.content,
+          latencyMs: Date.now() - start
+        };
+      } catch (err: any) {
+        clearTimeout(timeout);
+        lastError = err;
+        console.warn(`[AI-CORE-RETRY] NVIDIA Falhou na tentativa ${attempt}. ${err.message}`);
+        if (attempt < retries) {
+          await new Promise(res => setTimeout(res, 500 * Math.pow(2, attempt))); // Exponential backoff
+        }
+      }
+    }
+    throw lastError;
   }
 
   /**
