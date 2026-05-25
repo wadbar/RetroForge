@@ -3,6 +3,8 @@ import { Zap, Terminal, BrainCircuit, Bookmark, Search, Loader2, X } from 'lucid
 import { motion, AnimatePresence } from 'motion/react';
 import { symbolService } from '../../services/symbolService';
 import { debounce } from '../../utils/debounce';
+import { List, RowComponentProps } from 'react-window';
+import { AutoSizer } from 'react-virtualized-auto-sizer';
 
 interface HexEditorProps {
   projectId?: string;
@@ -110,7 +112,8 @@ export const HexEditorView: React.FC<HexEditorProps> = ({
   }
 
   const bytesPerLine = 16;
-  const maxLines = 20;
+  const rowHeight = 32;
+  const totalLines = Math.ceil((data.length - offset) / bytesPerLine);
 
   const calculateEntropy = (lineData: Uint8Array) => {
     const counts = new Uint32Array(256);
@@ -125,112 +128,107 @@ export const HexEditorView: React.FC<HexEditorProps> = ({
     return h / 8;
   };
 
-  const renderHexBytes = () => {
-    const lines = [];
-    
-    for (let i = 0; i < maxLines; i++) {
-      const lineOffset = offset + (i * bytesPerLine);
-      if (lineOffset >= data.length) break;
+  const Row = useCallback(({ index, style }: RowComponentProps) => {
+    const lineOffset = offset + (index * bytesPerLine);
+    if (lineOffset >= data.length) return null;
 
-      const hexBytes: string[] = [];
-      const asciiChars: string[] = [];
-      const diffFlags: boolean[] = [];
-      
-      for (let j = 0; j < bytesPerLine; j++) {
-        const currentIdx = lineOffset + j;
-        if (currentIdx < data.length) {
-          const byte = data[currentIdx];
-          hexBytes.push(byte.toString(16).padStart(2, '0').toUpperCase());
-          asciiChars.push((byte >= 32 && byte <= 126) ? String.fromCharCode(byte) : '.');
-          
-          if (showDiff && originalData && currentIdx < originalData.length) {
-            diffFlags.push(byte !== originalData[currentIdx]);
-          } else {
-            diffFlags.push(false);
-          }
+    const hexBytes: string[] = [];
+    const asciiChars: string[] = [];
+    const diffFlags: boolean[] = [];
+    
+    for (let j = 0; j < bytesPerLine; j++) {
+      const currentIdx = lineOffset + j;
+      if (currentIdx < data.length) {
+        const byte = data[currentIdx];
+        hexBytes.push(byte.toString(16).padStart(2, '0').toUpperCase());
+        asciiChars.push((byte >= 32 && byte <= 126) ? String.fromCharCode(byte) : '.');
+        
+        if (showDiff && originalData && currentIdx < originalData.length) {
+          diffFlags.push(byte !== originalData[currentIdx]);
         } else {
-          hexBytes.push('  ');
-          asciiChars.push(' ');
           diffFlags.push(false);
         }
+      } else {
+        hexBytes.push('  ');
+        asciiChars.push(' ');
+        diffFlags.push(false);
       }
-
-      const lineOffsetHex = lineOffset.toString(16).toUpperCase();
-      const symbol = projectId ? symbolService.getSymbolAt(projectId, `0x${lineOffsetHex}`) : undefined;
-      
-      const lineDataSlice = data.slice(lineOffset, Math.min(lineOffset + bytesPerLine, data.length));
-      const entropy = calculateEntropy(lineDataSlice);
-
-      lines.push(
-        <div key={i} className="flex gap-4 hover:bg-surface-variant px-2 py-1 rounded transition-colors group relative items-center">
-          <div className="w-1.5 h-6 rounded-full bg-outline-variant overflow-hidden flex flex-col justify-end" title={`Entropy: ${(entropy * 100).toFixed(1)}%`}>
-            <div className={`w-full transition-all duration-500 rounded-full ${entropy > 0.8 ? 'bg-error' : entropy > 0.5 ? 'bg-primary' : 'bg-secondary'}`} style={{ height: `${entropy * 100}%`, opacity: 0.4 + (entropy * 0.6) }} />
-          </div>
-          <div className="flex items-center gap-1 w-20">
-            <span className={`text-on-surface-variant group-hover:text-primary transition-colors font-mono ${symbol ? 'text-primary font-bold' : ''}`}>
-              {lineOffsetHex.padStart(8, '0')}
-            </span>
-            {symbol && <Bookmark className="w-2.5 h-2.5 text-primary fill-primary/20" />}
-          </div>
-          
-          <div className="grid grid-cols-16 gap-1 flex-1">
-            {hexBytes.map((hex, idx) => {
-              const isDiff = diffFlags[idx];
-              const currentPos = lineOffset + idx;
-              const isPadding = hex === '00' || hex === 'FF';
-              const isSearchResult = searchResults.some(res => currentPos >= res && currentPos < res + (searchQuery.replace(/\\s+/g, '').length / 2));
-              
-              let classes = "text-center cursor-crosshair rounded font-mono text-body-medium transition-all duration-300 ";
-              if (isSearchResult) {
-                 classes += "bg-tertiary text-on-tertiary font-bold shadow-[0_0_8px_var(--md-sys-color-tertiary)] ";
-              } else if (isDiff) {
-                 classes += "bg-errorContainer text-onErrorContainer underline decoration-dotted ";
-              } else if (isPadding) {
-                 classes += "text-on-surface-variant opacity-30 ";
-              } else {
-                 classes += "text-primary ";
-              }
-
-              return (
-                <span 
-                  key={idx} 
-                  className={classes}
-                  onMouseEnter={() => onHoverOffset?.(currentPos)}
-                  title={isDiff && originalData ? `Original: ${originalData[currentPos]?.toString(16).toUpperCase()}` : undefined}
-                >
-                  {hex}
-                </span>
-              );
-            })}
-          </div>
-          
-          <span className="text-on-surface-variant w-32 font-mono whitespace-pre opacity-60 group-hover:opacity-100 transition-opacity">{asciiChars.join('')}</span>
-          
-          <div className="absolute right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 bg-surface-container-high px-2 py-1 rounded shadow-lg z-10">
-            <button 
-              className="text-[10px] text-primary hover:text-on-primary border border-primary/30 hover:bg-primary px-2 py-1 rounded flex items-center gap-1 transition-all font-medium uppercase tracking-wider"
-              onClick={() => onAction('patch', { offset: lineOffset, hex: hexBytes })}
-            >
-              <Zap className="w-3 h-3" /> Patch
-            </button>
-            <button 
-              className="text-[10px] text-secondary hover:text-on-secondary border border-secondary/30 hover:bg-secondary px-2 py-1 rounded flex items-center gap-1 transition-all font-medium uppercase tracking-wider"
-              onClick={() => onAction('explain', { offset: lineOffset, hex: hexBytes })}
-            >
-              <Terminal className="w-3 h-3" /> Explain
-            </button>
-            <button 
-              className="text-[10px] text-tertiary hover:text-on-tertiary border border-tertiary/30 hover:bg-tertiary px-2 py-1 rounded flex items-center gap-1 transition-all font-medium uppercase tracking-wider"
-              onClick={() => onAction('suggest', { offset: lineOffset, hex: hexBytes })}
-            >
-              <BrainCircuit className="w-3 h-3" /> Suggest
-            </button>
-          </div>
-        </div>
-      );
     }
-    return lines;
-  };
+
+    const lineOffsetHex = lineOffset.toString(16).toUpperCase();
+    const symbol = projectId ? symbolService.getSymbolAt(projectId, `0x${lineOffsetHex}`) : undefined;
+    
+    const lineDataSlice = data.slice(lineOffset, Math.min(lineOffset + bytesPerLine, data.length));
+    const entropy = calculateEntropy(lineDataSlice);
+
+    return (
+      <div style={{ ...style, width: '100%' }} className="flex gap-4 hover:bg-surface-variant px-2 rounded transition-colors group items-center">
+        <div className="w-1.5 h-6 rounded-full bg-outline-variant overflow-hidden flex flex-col justify-end" title={`Entropy: ${(entropy * 100).toFixed(1)}%`}>
+          <div className={`w-full transition-all duration-500 rounded-full ${entropy > 0.8 ? 'bg-error' : entropy > 0.5 ? 'bg-primary' : 'bg-secondary'}`} style={{ height: `${entropy * 100}%`, opacity: 0.4 + (entropy * 0.6) }} />
+        </div>
+        <div className="flex items-center gap-1 w-20">
+          <span className={`text-on-surface-variant group-hover:text-primary transition-colors font-mono ${symbol ? 'text-primary font-bold' : ''}`}>
+            {lineOffsetHex.padStart(8, '0')}
+          </span>
+          {symbol && <Bookmark className="w-2.5 h-2.5 text-primary fill-primary/20" />}
+        </div>
+        
+        <div className="grid grid-cols-16 gap-1 flex-1">
+          {hexBytes.map((hex, idx) => {
+            const isDiff = diffFlags[idx];
+            const currentPos = lineOffset + idx;
+            const isPadding = hex === '  ';
+            const isSearchResult = searchResults.some(res => currentPos >= res && currentPos < res + (searchQuery.replace(/\s+/g, '').length / 2));
+            
+            let classes = "text-center cursor-crosshair rounded font-mono text-body-medium transition-all duration-300 ";
+            if (isSearchResult) {
+               classes += "bg-tertiary text-on-tertiary font-bold shadow-[0_0_8px_var(--md-sys-color-tertiary)] ";
+            } else if (isDiff) {
+               classes += "bg-errorContainer text-onErrorContainer underline decoration-dotted ";
+            } else if (hex === '00' || hex === 'FF' || isPadding) {
+               classes += "text-on-surface-variant opacity-30 ";
+            } else {
+               classes += "text-primary ";
+            }
+
+            return (
+              <span 
+                key={idx} 
+                className={classes}
+                onMouseEnter={() => onHoverOffset?.(currentPos)}
+                title={isDiff && originalData ? `Original: ${originalData[currentPos]?.toString(16).toUpperCase()}` : undefined}
+              >
+                {hex}
+              </span>
+            );
+          })}
+        </div>
+        
+        <span className="text-on-surface-variant w-32 font-mono whitespace-pre opacity-60 group-hover:opacity-100 transition-opacity">{asciiChars.join('')}</span>
+        
+        <div className="absolute right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 bg-surface-container-high px-2 py-1 rounded shadow-lg z-10">
+          <button 
+            className="text-[10px] text-primary hover:text-on-primary border border-primary/30 hover:bg-primary px-2 py-1 rounded flex items-center gap-1 transition-all font-medium uppercase tracking-wider"
+            onClick={() => onAction('patch', { offset: lineOffset, hex: hexBytes })}
+          >
+            <Zap className="w-3 h-3" /> Patch
+          </button>
+          <button 
+            className="text-[10px] text-secondary hover:text-on-secondary border border-secondary/30 hover:bg-secondary px-2 py-1 rounded flex items-center gap-1 transition-all font-medium uppercase tracking-wider"
+            onClick={() => onAction('explain', { offset: lineOffset, hex: hexBytes })}
+          >
+            <Terminal className="w-3 h-3" /> Explain
+          </button>
+          <button 
+            className="text-[10px] text-tertiary hover:text-on-tertiary border border-tertiary/30 hover:bg-tertiary px-2 py-1 rounded flex items-center gap-1 transition-all font-medium uppercase tracking-wider"
+            onClick={() => onAction('suggest', { offset: lineOffset, hex: hexBytes })}
+          >
+            <BrainCircuit className="w-3 h-3" /> Suggest
+          </button>
+        </div>
+      </div>
+    );
+  }, [data, offset, originalData, projectId, searchResults, searchQuery, showDiff, bytesPerLine, onHoverOffset, onAction]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden p-6 bg-surface">
@@ -249,13 +247,6 @@ export const HexEditorView: React.FC<HexEditorProps> = ({
              )}
            </div>
            <div className="flex items-center gap-2">
-             <button 
-                onClick={() => onOffsetChange(Math.max(0, offset - (bytesPerLine * maxLines)))}
-                className="m3-button-tonal !px-4 !py-1.5 disabled:opacity-30"
-                disabled={offset === 0}
-             >
-               PREV
-             </button>
              <div className="flex items-center gap-2 bg-surface-variant border border-outline-variant rounded-full px-4 py-1">
                <span className="text-label-medium text-on-surface-variant font-mono">0x</span>
                <input 
@@ -268,12 +259,6 @@ export const HexEditorView: React.FC<HexEditorProps> = ({
                  className="w-20 bg-transparent text-label-large text-primary font-mono outline-none uppercase"
                />
              </div>
-             <button 
-                onClick={() => onOffsetChange(offset + (bytesPerLine * maxLines))}
-                className="m3-button-tonal !px-4 !py-1.5"
-             >
-               NEXT
-             </button>
            </div>
          </div>
          
@@ -365,12 +350,20 @@ export const HexEditorView: React.FC<HexEditorProps> = ({
          </div>
        </div>
 
-       <div className="flex-1 overflow-auto custom-scrollbar flex flex-col border border-outline-variant bg-surface-container-low rounded-2xl p-4 m3-card">
-          <div className="space-y-1">
-            {renderHexBytes()}
-          </div>
+       <div className="flex-1 border border-outline-variant bg-surface-container-low rounded-2xl p-2 m3-card relative overflow-hidden">
+        <AutoSizer renderProp={({ height, width }) => (
+            <List
+              style={{ width: width || 0, height: height || 0 }}
+              rowCount={totalLines}
+              rowHeight={rowHeight}
+              rowProps={{}}
+              rowComponent={Row}
+              className="custom-scrollbar"
+            />
+          )} />
        </div>
     </div>
   );
 };
+;
 

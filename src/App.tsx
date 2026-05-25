@@ -196,7 +196,7 @@ export default function App() {
         onClick={() => navigate(item.path)}
         aria-label={item.label}
         aria-current={isActive ? 'page' : undefined}
-        className={`w-full flex ${isSidebarOpen ? 'flex-row items-center px-4 justify-start' : 'flex-col items-center justify-center px-0'} py-3 gap-1 rounded-full transition-colors relative mb-1 min-h-[44px] ${
+        className={`w-full flex ${isSidebarOpen ? 'flex-row items-center px-4 justify-start' : 'flex-col items-center justify-center px-0'} py-3 gap-1 rounded-full transition-colors relative mb-1 min-h-[48px] touch-manipulation ${
           isActive 
             ? 'bg-secondary-container text-on-secondary-container font-medium' 
             : 'text-on-surface-variant hover:bg-surface-variant/50 hover:text-on-surface font-normal'

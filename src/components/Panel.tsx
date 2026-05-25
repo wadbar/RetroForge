@@ -1,11 +1,36 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Activity, ShieldAlert, Cpu, Radio, Trash2, Zap, CheckCircle2, AlertTriangle, XCircle, TrendingUp, Moon, Sun, Search, Loader2, X } from 'lucide-react';
+import { Activity, ShieldAlert, Cpu, Radio, Trash2, Zap, CheckCircle2, AlertTriangle, XCircle, TrendingUp, Moon, Sun, Search, Loader2, X, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LineChart, Line, ResponsiveContainer, YAxis, Tooltip, AreaChart, Area } from 'recharts';
 import { monitor } from '../services/monitorService';
 import { SystemHealth, SystemStatus } from '../core/types';
 import { eventBus } from '../services/eventBus';
 import { debounce } from '../utils/debounce';
+import { List, RowComponentProps } from 'react-window';
+import { AutoSizer } from 'react-virtualized-auto-sizer';
+
+function useLocalStorage<T>(key: string, initialValue: T) {
+  const [storedValue, setStoredValue] = useState<T>(() => {
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : initialValue;
+    } catch (error) {
+      return initialValue;
+    }
+  });
+
+  const setValue = (value: T | ((val: T) => T)) => {
+    try {
+      const valueToStore = value instanceof Function ? value(storedValue) : value;
+      setStoredValue(valueToStore);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(key, JSON.stringify(valueToStore));
+      }
+    } catch (error) {}
+  };
+
+  return [storedValue, setValue] as const;
+}
 
 export const Panel: React.FC = () => {
   const [health, setHealth] = useState<SystemHealth>(monitor.getHealthData());
@@ -25,10 +50,16 @@ export const Panel: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<number[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchProgress, setSearchProgress] = useState(0);
   const [isRegexMode, setIsRegexMode] = useState(false);
-  const [searchHistory, setSearchHistory] = useState<string[]>([]);
-  const [hoveredByte, setHoveredByte] = useState<number | null>(null);
+  const [searchHistory, setSearchHistory] = useLocalStorage<string[]>('RF_SEARCH_HISTORY', []);
+  const [hoveredByte, setHoveredByte] = useState<{index: number, x: number, y: number} | null>(null);
   const workerRef = useRef<Worker | null>(null);
+  const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
+  
+  // Virtualization state
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [visibleStartRow, setVisibleStartRow] = useState(0);
 
   const hexData = React.useMemo(() => {
     const data = new Uint8Array(1024);
@@ -39,9 +70,12 @@ export const Panel: React.FC = () => {
   useEffect(() => {
     workerRef.current = new Worker(new URL('../core/workers/fuzzy.worker.ts', import.meta.url), { type: 'module' });
     workerRef.current.onmessage = (e) => {
-      setIsSearching(false);
       if (e.data.type === 'SUCCESS') {
+        setIsSearching(false);
         setSearchResults(e.data.results);
+        setSearchProgress(100);
+      } else if (e.data.type === 'PROGRESS') {
+        setSearchProgress(e.data.progress);
       }
     };
     return () => {
@@ -53,16 +87,18 @@ export const Panel: React.FC = () => {
     if (!query) {
       setSearchResults([]);
       setIsSearching(false);
+      setSearchProgress(0);
       return;
     }
     setIsSearching(true);
+    setSearchProgress(0);
     workerRef.current?.postMessage({ query, data: hexData, isRegex: regexMode });
     
     setSearchHistory(prev => {
       const history = [query, ...prev.filter(q => q !== query)].slice(0, 10);
       return history;
     });
-  }, [hexData]);
+  }, [hexData, setSearchHistory]);
 
   const debouncedSearch = React.useMemo(() => debounce(runSearch, 300), [runSearch]);
 
@@ -388,19 +424,6 @@ export const Panel: React.FC = () => {
               <Search className="w-5 h-5 text-primary" />
               Binary Hex Inspector Search
             </div>
-            {searchHistory.length > 0 && (
-               <div className="flex gap-2 overflow-x-auto no-scrollbar w-full mt-2 z-10">
-                 {searchHistory.map((hist, idx) => (
-                   <span 
-                     key={idx} 
-                     onClick={() => handleSearchChange(hist)}
-                     className="text-[10px] cursor-pointer bg-surface hover:bg-surface-variant text-on-surface-variant font-mono px-2 py-0.5 rounded border border-outline-variant whitespace-nowrap"
-                   >
-                     {hist}
-                   </span>
-                 ))}
-               </div>
-            )}
           </div>
           <p className="text-body-medium text-on-surface-variant z-10">Busca fuzzy assíncrona off-thread usando Web Worker e heurísticas Hex (ex: 24 ?? ?? 80).</p>
 
@@ -415,7 +438,7 @@ export const Panel: React.FC = () => {
             )}
           </AnimatePresence>
 
-          <div className="flex flex-col sm:flex-row items-center gap-3 bg-surface border border-outline-variant rounded-full px-4 py-1.5 z-10 relative overflow-hidden">
+          <div className="flex flex-col sm:flex-row items-center gap-3 bg-surface border border-outline-variant rounded-full px-4 py-1.5 z-10 relative overflow-visible">
              <Search className="w-4 h-4 text-on-surface-variant" />
              <button 
                onClick={toggleRegexMode}
@@ -440,9 +463,51 @@ export const Panel: React.FC = () => {
                  <X className="w-4 h-4" />
                </button>
              )}
+             
+             {/* Dropdown Toggle */}
+             <div className="relative">
+               <button 
+                 onClick={() => setShowHistoryDropdown(!showHistoryDropdown)}
+                 className="p-1 hover:bg-surface-variant rounded-full text-on-surface-variant transition-colors"
+                 title="Search History"
+               >
+                 <ChevronDown className={`w-4 h-4 transition-transform ${showHistoryDropdown ? 'rotate-180' : ''}`} />
+               </button>
+
+               <AnimatePresence>
+                 {showHistoryDropdown && searchHistory.length > 0 && (
+                   <motion.div 
+                     initial={{ opacity: 0, y: 10 }}
+                     animate={{ opacity: 1, y: 0 }}
+                     exit={{ opacity: 0, y: 10 }}
+                     className="absolute right-0 top-full mt-2 w-48 bg-surface-container-high border border-outline-variant rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.4)] z-50 overflow-hidden"
+                   >
+                     <div className="p-2 text-[10px] font-bold text-on-surface-variant uppercase border-b border-outline-variant px-3">
+                       Últimas Buscas
+                     </div>
+                     <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                       {searchHistory.map((hist, idx) => (
+                         <button
+                           key={idx}
+                           onClick={() => {
+                             handleSearchChange(hist);
+                             setShowHistoryDropdown(false);
+                           }}
+                           className="w-full text-left px-3 py-2 text-body-medium font-mono hover:bg-surface-variant text-on-surface transition-colors truncate"
+                         >
+                           {hist}
+                         </button>
+                       ))}
+                     </div>
+                   </motion.div>
+                 )}
+               </AnimatePresence>
+             </div>
+
              <div className="flex items-center gap-3">
                {isSearching && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
-               {searchResults.length > 0 && (
+               {isSearching && <span className="text-label-medium text-primary font-bold">{searchProgress}%</span>}
+               {searchResults.length > 0 && !isSearching && (
                  <span className="text-label-medium text-primary font-bold">
                    {searchResults.length > 50 ? '50+ Match(es)' : `${searchResults.length} Match(es)`}
                  </span>
@@ -453,53 +518,73 @@ export const Panel: React.FC = () => {
               <div className="h-0.5 w-full bg-surface-variant overflow-hidden absolute bottom-0 left-0">
                 <motion.div 
                    className="h-full bg-primary"
-                   initial={{ x: '-100%' }}
-                   animate={{ x: '100%' }}
-                   transition={{ repeat: Infinity, duration: 1.5, ease: 'easeInOut' }}
+                   style={{ width: `${searchProgress}%` }}
+                   initial={{ width: 0 }}
+                   animate={{ width: `${searchProgress}%` }}
+                   transition={{ duration: 0.2 }}
                 />
               </div>
             )}
           </div>
 
-          <div className="flex-1 overflow-visible custom-scrollbar flex flex-col border border-outline-variant bg-surface-container-low rounded-2xl p-4 mt-4 h-48 relative">
-             <div className="grid grid-cols-16 gap-1 flex-1 relative">
-                {Array.from({ length: 128 }).map((_, i) => {
-                  const hex = hexData[i].toString(16).padStart(2, '0').toUpperCase();
-                  const isSearchResult = searchResults.some(res => {
-                    const matchLen = isRegexMode ? 1 : Math.max(1, Math.floor(searchQuery.replace(/\s+/g, '').length / 2));
-                    return i >= res && i < res + matchLen;
-                  });
-                  let classes = "text-center cursor-crosshair rounded font-mono text-body-medium transition-all duration-300 relative group ";
-                  if (isSearchResult) {
-                     classes += "bg-tertiary text-on-tertiary font-bold shadow-[0_0_8px_var(--md-sys-color-tertiary)] ";
-                  } else {
-                     classes += "text-primary hover:bg-primary/20 ";
-                  }
-                  return (
-                    <span 
-                      key={i} 
-                      className={classes}
-                      onMouseOver={() => setHoveredByte(i)}
-                      onMouseOut={() => setHoveredByte(null)}
-                    >
-                      {hex}
-                    </span>
-                  );
-                })}
-             </div>
-             {hoveredByte !== null && hoveredByte < hexData.length - 3 && (
+          <div className="flex-1 border border-outline-variant bg-surface-container-low rounded-2xl p-4 mt-4 h-48 relative overflow-hidden">
+             <AutoSizer renderProp={({ height, width }) => {
+                 const matchLenCache = isRegexMode ? 1 : Math.max(1, Math.floor(searchQuery.replace(/\s+/g, '').length / 2));
+                 return (
+                   <List
+                     style={{ width: width || 0, height: height || 0 }}
+                     rowCount={Math.ceil(hexData.length / 16)}
+                     rowHeight={24}
+                     rowProps={{}}
+                     rowComponent={({ index, style }: RowComponentProps) => {
+                       return (
+                         <div style={style} className="grid grid-cols-16 gap-1 w-full">
+                           {Array.from({ length: 16 }).map((_, colIdx) => {
+                             const i = index * 16 + colIdx;
+                             if (i >= hexData.length) return <span key={colIdx} />;
+                             
+                             const hex = hexData[i].toString(16).padStart(2, '0').toUpperCase();
+                             const isSearchResult = searchResults.some(res => i >= res && i < res + matchLenCache);
+                             let classes = "text-center cursor-crosshair rounded font-mono text-[13px] h-[20px] transition-all duration-300 relative group flex items-center justify-center ";
+                             if (isSearchResult) {
+                                classes += "bg-tertiary text-on-tertiary font-bold shadow-[0_0_8px_var(--md-sys-color-tertiary)] ";
+                             } else {
+                                classes += "text-primary hover:bg-primary/20 ";
+                             }
+                             
+                             return (
+                               <span 
+                                 key={colIdx} 
+                                 className={classes}
+                                 onMouseOver={(e) => setHoveredByte({ index: i, x: e.clientX, y: e.clientY })}
+                                 onMouseOut={() => setHoveredByte(null)}
+                               >
+                                 {hex}
+                               </span>
+                             );
+                           })}
+                         </div>
+                       );
+                     }}
+                     className="custom-scrollbar"
+                   />
+                 );
+               }} />
+             
+             {hoveredByte !== null && hoveredByte.index < hexData.length - 3 && (
                <div 
-                 className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 p-3 bg-inverse-surface text-inverse-on-surface rounded shadow-lg text-xs font-mono z-50 pointer-events-none grid grid-cols-2 gap-4 border border-outline-variant"
+                 className="fixed p-3 bg-inverse-surface text-inverse-on-surface rounded shadow-xl text-xs font-mono z-[9999] pointer-events-none grid grid-cols-2 gap-4 border border-outline-variant"
+                 style={{ left: hoveredByte.x + 15, top: hoveredByte.y + 15 }}
                >
                  <div>
                    <div className="text-[9px] text-on-surface-variant font-bold uppercase mb-1">16-bit</div>
-                   <div>LE: {new DataView(hexData.buffer).getInt16(hoveredByte, true)}</div>
-                   <div>BE: {new DataView(hexData.buffer).getInt16(hoveredByte, false)}</div>
+                   <div>LE: {new DataView(hexData.buffer).getInt16(hoveredByte.index, true)}</div>
+                   <div>BE: {new DataView(hexData.buffer).getInt16(hoveredByte.index, false)}</div>
                  </div>
                  <div>
                    <div className="text-[9px] text-on-surface-variant font-bold uppercase mb-1">32-bit</div>
-                   <div>LE: {new DataView(hexData.buffer).getInt32(hoveredByte, true)}</div>
-                   <div>BE: {new DataView(hexData.buffer).getInt32(hoveredByte, false)}</div>
+                   <div>LE: {new DataView(hexData.buffer).getInt32(hoveredByte.index, true)}</div>
+                   <div>BE: {new DataView(hexData.buffer).getInt32(hoveredByte.index, false)}</div>
                  </div>
                </div>
              )}
